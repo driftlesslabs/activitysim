@@ -1,10 +1,13 @@
+from __future__ import annotations
+
 import os
 from typing import Collection
 
+import larch
 import numpy as np
 import pandas as pd
 import yaml
-from larch import DataFrames, Model, P, X
+from larch import Model, P, X
 from larch.util import Dict
 
 from .general import (
@@ -40,7 +43,10 @@ def auto_ownership_model(
     # Remove choosers with invalid observed choice
     chooser_data = chooser_data[chooser_data["override_choice"] >= 0]
 
-    m = Model()
+    d = larch.Dataset.construct.from_idco(
+        chooser_data, alts=dict(zip(altcodes, altnames))
+    )
+    m = Model(d, compute_engine="numba")
     # One of the alternatives is coded as 0, so
     # we need to explicitly initialize the MNL nesting graph
     # and set to root_id to a value other than zero.
@@ -54,14 +60,6 @@ def auto_ownership_model(
 
     apply_coefficients(coefficients, m)
 
-    d = DataFrames(
-        co=chooser_data,
-        av=True,
-        alt_codes=altcodes,
-        alt_names=altnames,
-    )
-
-    m.dataservice = d
     m.choice_co_code = "override_choice"
 
     if return_data:

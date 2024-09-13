@@ -1,10 +1,13 @@
+from __future__ import annotations
+
 import os
 from pathlib import Path
 
+import larch
 import numpy as np
 import pandas as pd
 import yaml
-from larch import DataFrames, Model
+from larch import Model
 from larch.util import Dict
 
 from .general import (
@@ -171,15 +174,14 @@ def simple_simulate_model(
 
     if construct_avail:
         avail = construct_availability(m, chooser_data, data.alt_codes_to_names)
+        d = larch.Dataset.construct.from_idco(
+            pd.concat([chooser_data, avail], axis=1), alts=dict(zip(altcodes, altnames))
+        )
     else:
         avail = True
-
-    d = DataFrames(
-        co=chooser_data,
-        av=avail,
-        alt_codes=alt_codes,
-        alt_names=alt_names,
-    )
+        d = larch.Dataset.construct.from_idco(
+            chooser_data, alts=dict(zip(altcodes, altnames))
+        )
 
     m.dataservice = d
     m.choice_co_code = "override_choice_code"

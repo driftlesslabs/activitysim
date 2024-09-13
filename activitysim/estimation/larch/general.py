@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import os
 from pathlib import Path
@@ -5,13 +7,14 @@ from typing import Mapping
 
 import numpy as np
 import pandas as pd
-from larch import DataFrames, Model, P, X  # noqa: F401
-from larch.log import logger_name
-from larch.model.abstract_model import AbstractChoiceModel
+from larch import Model, P, X  # noqa: F401
+
+# from larch.log import logger_name
+# from larch.model.abstract_model import AbstractChoiceModel
 from larch.model.tree import NestingTree
 from larch.util import Dict  # noqa: F401
 
-_logger = logging.getLogger(logger_name)
+_logger = logging.getLogger("larch")
 
 
 def cv_to_ca(alt_values, dtype="float64", required_labels=None):
@@ -326,7 +329,7 @@ def apply_coefficients(coefficients, model, minimum=None, maximum=None):
             )
             coefficients["constrain"] = "F"
         assert coefficients.index.name == "coefficient_name"
-        assert isinstance(model, AbstractChoiceModel)
+        # assert isinstance(model, AbstractChoiceModel)
         explicit_value_parameters(model)
         for i in coefficients.itertuples():
             if i.Index in model:
