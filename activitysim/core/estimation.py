@@ -6,11 +6,14 @@ import logging
 import os
 import shutil
 from pathlib import Path
+from typing import Any, Literal
 
 import pandas as pd
 import yaml
+from pydantic import BaseModel, class_validators, model_validator
 
 from activitysim.core import simulate, workflow
+from activitysim.core.configuration import PydanticReadable
 from activitysim.core.configuration.base import PydanticBase
 from activitysim.core.util import reindex
 from activitysim.core.yaml_tools import safe_dump
@@ -48,14 +51,53 @@ def estimation_enabled(state):
     return settings is not None
 
 
+class SurveyTableConfig(PydanticBase):
+    file_name: str
+    index_col: str
+
+    # The dataframe is stored in the loaded config dynamically but not given
+    # directly in the config file, as it's not a simple serializable object that
+    # can be written in a YAML file.
+    df: pd.DataFrame | None = None
+
+
+class EstimationTableRecipeConfig(PydanticBase):
+    omnibus_tables: dict[str, list[str]]
+    omnibus_tables_append_columns: list[str]
+
+
+class EstimationConfig(PydanticReadable):
+    SKIP_BUNDLE_WRITE_FOR: list[str] = []
+    EDB_FILETYPE: Literal["csv", "parquet", "pkl"] = "csv"
+    EDB_ALTS_FILE_FORMAT: Literal["verbose", "compact"] = "verbose"
+
+    enable: bool = False
+    bundles: list[str] = []
+    model_estimation_table_types: dict[str, str] = {}
+    estimation_table_recipes: dict[str, EstimationTableRecipeConfig] = {}
+    survey_tables: dict[str, SurveyTableConfig] = {}
+
+    # pydantic class validator to ensure that the model_estimation_table_types
+    # dictionary is a valid dictionary with string keys and string values, and
+    # that all the values are in the estimation_table_recipes dictionary
+    @model_validator(mode="after")
+    def validate_model_estimation_table_types(self):
+        for key, value in self.model_estimation_table_types.items():
+            if value not in self.estimation_table_recipes:
+                raise ValueError(
+                    f"model_estimation_table_types value '{value}' not in estimation_table_recipes"
+                )
+        return self
+
+
 class Estimator:
     def __init__(
         self,
         state: workflow.State,
-        bundle_name,
-        model_name,
-        estimation_table_recipes,
-        settings,
+        bundle_name: str,
+        model_name: str,
+        estimation_table_recipes: dict[str, Any],
+        settings: EstimationConfig,
     ):
         logger.info("Initialize Estimator for'%s'" % (model_name,))
 
@@ -345,7 +387,7 @@ class Estimator:
         if len(self.omnibus_tables) == 0:
             return
 
-        edbs_to_skip = self.settings.get("SKIP_BUNDLE_WRITE_FOR", [])
+        edbs_to_skip = self.settings.SKIP_BUNDLE_WRITE_FOR
         if self.bundle_name in edbs_to_skip:
             self.debug(f"Skipping write to disk for {self.bundle_name}")
             return
@@ -376,7 +418,7 @@ class Estimator:
             self.debug(f"sorting tables: {table_names}")
             df.sort_index(ascending=True, inplace=True, kind="mergesort")
 
-            filetype = self.settings.get("EDB_FILETYPE", "csv")
+            filetype = self.settings.EDB_FILETYPE
 
             if filetype == "csv":
                 file_path = self.output_file_path(omnibus_table, "csv")
@@ -460,7 +502,7 @@ class Estimator:
             choosers_df,
             "choosers",
             append=True,
-            filetype=self.settings.get("EDB_FILETYPE", "csv"),
+            filetype=self.settings.EDB_FILETYPE,
         )
 
     def write_choices(self, choices):
@@ -471,7 +513,7 @@ class Estimator:
             choices,
             "choices",
             append=True,
-            filetype=self.settings.get("EDB_FILETYPE", "csv"),
+            filetype=self.settings.EDB_FILETYPE,
         )
 
     def write_override_choices(self, choices):
@@ -482,7 +524,7 @@ class Estimator:
             choices,
             "override_choices",
             append=True,
-            filetype=self.settings.get("EDB_FILETYPE", "csv"),
+            filetype=self.settings.EDB_FILETYPE,
         )
 
     def write_constants(self, constants):
@@ -582,7 +624,7 @@ class Estimator:
         # 31153,2,util_dist_0_1,1.0
         # 31153,3,util_dist_0_1,1.0
 
-        output_format = self.settings.get("EDB_ALTS_FILE_FORMAT", "verbose")
+        output_format = self.settings.EDB_ALTS_FILE_FORMAT
         assert output_format in ["verbose", "compact"]
 
         if output_format == "compact":
@@ -613,7 +655,7 @@ class Estimator:
             df,
             "interaction_expression_values",
             append=True,
-            filetype=self.settings.get("EDB_FILETYPE", "csv"),
+            filetype=self.settings.EDB_FILETYPE,
         )
 
     def write_expression_values(self, df):
@@ -621,7 +663,7 @@ class Estimator:
             df,
             "expression_values",
             append=True,
-            filetype=self.settings.get("EDB_FILETYPE", "csv"),
+            filetype=self.settings.EDB_FILETYPE,
         )
 
     def write_alternatives(self, alternatives_df, bundle_directory=False):
@@ -638,7 +680,7 @@ class Estimator:
             alternatives_df,
             "interaction_sample_alternatives",
             append=True,
-            filetype=self.settings.get("EDB_FILETYPE", "csv"),
+            filetype=self.settings.EDB_FILETYPE,
         )
 
     def write_interaction_simulate_alternatives(self, interaction_df):
@@ -647,7 +689,7 @@ class Estimator:
             interaction_df,
             "interaction_simulate_alternatives",
             append=True,
-            filetype=self.settings.get("EDB_FILETYPE", "csv"),
+            filetype=self.settings.EDB_FILETYPE,
         )
 
     def get_survey_values(self, model_values, table_name, column_names):
@@ -690,25 +732,21 @@ class EstimationManager(object):
             return
 
         assert not self.settings_initialized
-        self.settings = state.filesystem.read_model_settings(
-            ESTIMATION_SETTINGS_FILE_NAME, mandatory=False
+        self.settings = EstimationConfig.read_settings_file(
+            state.filesystem, ESTIMATION_SETTINGS_FILE_NAME, mandatory=False
         )
         if not self.settings:
             # if the model self.settings file is not found, we are not in estimation mode.
             self.enabled = False
         else:
-            self.enabled = self.settings.get("enable", "True")
-        self.bundles = self.settings.get("bundles", [])
+            self.enabled = self.settings.enable
+        self.bundles = self.settings.bundles
 
-        self.model_estimation_table_types = self.settings.get(
-            "model_estimation_table_types", {}
-        )
-        self.estimation_table_recipes = self.settings.get(
-            "estimation_table_recipes", {}
-        )
+        self.model_estimation_table_types = self.settings.model_estimation_table_types
+        self.estimation_table_recipes = self.settings.estimation_table_recipes
 
         if self.enabled:
-            self.survey_tables = self.settings.get("survey_tables", {})
+            self.survey_tables = self.settings.survey_tables
             for table_name, table_info in self.survey_tables.items():
                 assert (
                     "file_name" in table_info
@@ -723,7 +761,7 @@ class EstimationManager(object):
                     file_path
                 ), "File for survey table '%s' not found: %s" % (table_name, file_path)
                 df = pd.read_csv(file_path)
-                index_col = table_info.get("index_col")
+                index_col = table_info.index_col
                 if index_col is not None:
                     assert (
                         index_col in df.columns
