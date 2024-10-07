@@ -58,6 +58,9 @@ class SurveyTableConfig(PydanticBase):
     # The dataframe is stored in the loaded config dynamically but not given
     # directly in the config file, as it's not a simple serializable object that
     # can be written in a YAML file.
+    class Config:
+        arbitrary_types_allowed = True
+
     df: pd.DataFrame | None = None
 
 
