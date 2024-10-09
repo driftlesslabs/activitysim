@@ -752,13 +752,10 @@ class EstimationManager(object):
             self.survey_tables = self.settings.survey_tables
             for table_name, table_info in self.survey_tables.items():
                 assert (
-                    "file_name" in table_info
-                ), "No file name specified for survey_table '%s' in %s" % (
-                    table_name,
-                    ESTIMATION_SETTINGS_FILE_NAME,
-                )
+                    table_info.file_name
+                ), f"No file name specified for survey_table '{table_name}' in {ESTIMATION_SETTINGS_FILE_NAME}"
                 file_path = state.filesystem.get_data_file_path(
-                    table_info["file_name"], mandatory=True
+                    table_info.file_name, mandatory=True
                 )
                 assert os.path.exists(
                     file_path
@@ -784,7 +781,7 @@ class EstimationManager(object):
                         df = df[df.household_id.isin(pipeline_hh_ids)]
 
                 # add the table df to survey_tables
-                table_info["df"] = df
+                table_info.df = df
 
         self.settings_initialized = True
 
