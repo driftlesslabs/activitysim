@@ -75,9 +75,30 @@ class EstimationConfig(PydanticReadable):
     EDB_ALTS_FILE_FORMAT: Literal["verbose", "compact"] = "verbose"
 
     enable: bool = False
+    """Flag to enable estimation."""
+
     bundles: list[str] = []
+    """List of component names to create EDBs for."""
+
     model_estimation_table_types: dict[str, str] = {}
+    """Mapping of component names to estimation table types.
+
+    The keys of this mapping are the model component names, and the values are the
+    names of the estimation table recipes that should be used to generate the
+    estimation tables for the model component.  The recipes are generally related
+    to the generic model types, such as 'simple_simulate', 'interaction_simulate',
+    'interaction_sample_simulate', etc.
+    """
+
     estimation_table_recipes: dict[str, EstimationTableRecipeConfig] = {}
+    """Mapping of estimation table recipe names to their configurations.
+
+    The keys of this mapping are the names of the estimation table recipes.
+    The recipes are generally related to the generic model types, such as
+    'simple_simulate', 'interaction_simulate', 'interaction_sample_simulate',
+    etc. The values are the configurations for the estimation table recipes.
+    """
+
     survey_tables: dict[str, SurveyTableConfig] = {}
 
     # pydantic class validator to ensure that the model_estimation_table_types
@@ -99,7 +120,7 @@ class Estimator:
         state: workflow.State,
         bundle_name: str,
         model_name: str,
-        estimation_table_recipes: dict[str, Any],
+        estimation_table_recipe: EstimationTableRecipeConfig,
         settings: EstimationConfig,
     ):
         logger.info("Initialize Estimator for'%s'" % (model_name,))
@@ -108,7 +129,7 @@ class Estimator:
         self.bundle_name = bundle_name
         self.model_name = model_name
         self.settings_name = model_name
-        self.estimation_table_recipes = estimation_table_recipes
+        self.estimation_table_recipe = estimation_table_recipe
         self.estimating = True
         self.settings = settings
 
@@ -129,10 +150,10 @@ class Estimator:
         # assert 'override_choices' in self.model_settings, \
         #     "override_choices not found for %s in %s." % (model_name, ESTIMATION_SETTINGS_FILE_NAME)
 
-        self.omnibus_tables = self.estimation_table_recipes["omnibus_tables"]
-        self.omnibus_tables_append_columns = self.estimation_table_recipes[
-            "omnibus_tables_append_columns"
-        ]
+        self.omnibus_tables = self.estimation_table_recipe.omnibus_tables
+        self.omnibus_tables_append_columns = (
+            self.estimation_table_recipe.omnibus_tables_append_columns
+        )
         self.tables = {}
         self.tables_to_cache = [
             table_name
@@ -724,8 +745,8 @@ class EstimationManager(object):
     def __init__(self):
         self.settings_initialized = False
         self.bundles = []
-        self.estimation_table_recipes = {}
-        self.model_estimation_table_types = {}
+        self.estimation_table_recipes: dict[str, EstimationTableRecipeConfig] = {}
+        self.model_estimation_table_types: dict[str, str] = {}
         self.estimating = {}
         self.settings = None
 
@@ -843,7 +864,7 @@ class EstimationManager(object):
             state,
             bundle_name,
             model_name,
-            estimation_table_recipes=self.estimation_table_recipes[
+            estimation_table_recipe=self.estimation_table_recipes[
                 model_estimation_table_type
             ],
             settings=self.settings,
