@@ -1,11 +1,14 @@
+from __future__ import annotations
+
 import os
 from pathlib import Path
 from typing import Collection
 
 import numpy as np
 import pandas as pd
+import xarray as xr
 import yaml
-from larch import DataFrames, Model, P, X
+from larch import Dataset, Model, P, X
 from larch.util import Dict
 
 from .general import (
@@ -79,20 +82,18 @@ def mode_choice_model(
         m[purposes[0]], chooser_data, data.alt_codes_to_names
     )
 
-    d = DataFrames(
-        co=chooser_data,
-        av=avail,
-        alt_codes=data.alt_codes,
-        alt_names=data.alt_names,
+    d = Dataset.construct.from_idco(
+        chooser_data, alts=dict(zip(data.alt_codes, data.alt_names))
     )
+    d["_avail_"] = xr.DataArray(avail, dims=(d.dc.CASEID, d.dc.ALTID))
 
     if "atwork" not in name:
         for purpose, model in m.items():
-            model.dataservice = d.selector_co(f"tour_type=='{purpose}'")
+            model.datatree = d.dc.query_cases(f"tour_type=='{purpose}'")
             model.choice_co_code = "override_choice_code"
     else:
         for purpose, model in m.items():
-            model.dataservice = d
+            model.datatree = d
             model.choice_co_code = "override_choice_code"
 
     from larch.model.model_group import ModelGroup

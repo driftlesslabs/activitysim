@@ -422,7 +422,8 @@ def construct_nesting_tree(alternatives, nesting_settings):
             else:
                 make_nest(a, parent_code=nest_names_to_codes[cfg["name"]])
 
-    make_nest(nesting_settings)
+    if nesting_settings:
+        make_nest(nesting_settings)
 
     return tree
 

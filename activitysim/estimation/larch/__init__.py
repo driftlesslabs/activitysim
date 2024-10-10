@@ -3,16 +3,18 @@ from __future__ import annotations
 import larch
 from packaging.version import Version
 
+# from .stop_frequency import *
+from .auto_ownership import auto_ownership_model
+
 # from .cdap import *
 # from .data_maker import *
 # from .general import *
 # from .location_choice import *
-# from .mode_choice import *
+from .mode_choice import *
+
 # from .nonmand_tour_freq import *
 # from .scheduling import *
-# from .simple_simulate import *
-# from .stop_frequency import *
-from .auto_ownership import auto_ownership_model
+from .simple_simulate import *
 
 # require larch version 6.0.0 or later
 if Version(larch.__version__) < Version("6.0.0"):

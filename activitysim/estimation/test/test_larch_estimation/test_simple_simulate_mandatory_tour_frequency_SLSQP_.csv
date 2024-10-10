@@ -1,4 +1,4 @@
-,value,initvalue,nullvalue,minimum,maximum,best
+param_name,value,initvalue,nullvalue,minimum,maximum,best
 0,0,0,0,0,0,0
 coef_can_walk_to_work_and_school,0.071630314724926147,0.1391,0,,,0.071630314724926147
 coef_can_walk_to_work_school2,1.3680922080710298,0.71140000000000003,0,,,1.3680922080710298

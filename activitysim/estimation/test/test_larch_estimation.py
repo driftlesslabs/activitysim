@@ -55,15 +55,15 @@ def _regression_check(dataframe_regression, df, basename=None, rtol=None):
 @pytest.mark.parametrize(
     "name,method",
     [
-        # ("free_parking", "BHHH"),
+        ("free_parking", "BHHH"),
         # ("mandatory_tour_frequency", "SLSQP"),
-        # ("joint_tour_frequency", "SLSQP"),
-        # ("joint_tour_composition", "SLSQP"),
-        # ("joint_tour_participation", "SLSQP"),
-        # ("mandatory_tour_frequency", "BHHH"),
-        # ("atwork_subtour_frequency", "SLSQP"),
+        ("joint_tour_frequency", "SLSQP"),
+        ("joint_tour_composition", "SLSQP"),
+        ("joint_tour_participation", "SLSQP"),
+        ("mandatory_tour_frequency", "BHHH"),
+        ("atwork_subtour_frequency", "SLSQP"),
         ("auto_ownership", "BHHH"),
-        # ("trip_mode_choice", "SLSQP"),
+        ("trip_mode_choice", "SLSQP"),
     ],
 )
 def test_simple_simulate(est_data, num_regression, dataframe_regression, name, method):
