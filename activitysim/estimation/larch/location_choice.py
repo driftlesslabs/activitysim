@@ -1,15 +1,16 @@
 from __future__ import annotations
 
+import collections
 import os
-from pathlib import Path
-from typing import Collection
 import pickle
 from datetime import datetime
+from pathlib import Path
+from typing import Collection
 
 import numpy as np
 import pandas as pd
 import yaml
-from larch import DataFrames, Model, P, X
+from larch import Dataset, Model, P, X
 from larch.util import Dict
 
 from .general import (
@@ -37,6 +38,23 @@ def size_coefficients_from_spec(size_spec):
     return size_coef
 
 
+LocationChoiceData = collections.namedtuple(
+    "LocationChoiceData",
+    field_names=[
+        "edb_directory",
+        "alt_values",
+        "chooser_data",
+        "coefficients",
+        "landuse",
+        "spec",
+        "size_spec",
+        "master_size_spec",
+        "model_selector",
+        "settings",
+    ],
+)
+
+
 def location_choice_model(
     name="workplace_location",
     edb_directory="output/estimation_data_bundle/{name}/",
@@ -50,7 +68,7 @@ def location_choice_model(
     return_data=False,
     alt_values_to_feather=False,
     chunking_size=None,
-):
+) -> Model | tuple[Model, LocationChoiceData]:
     model_selector = name.replace("_location", "")
     model_selector = model_selector.replace("_destination", "")
     model_selector = model_selector.replace("_subtour", "")
@@ -287,22 +305,28 @@ def location_choice_model(
             x_ca_1["util_no_attractions"]
             .apply(lambda x: False if x == 1 else True)
             .astype(np.int8)
+            .to_xarray()
         )
     elif "@df['size_term']==0" in x_ca_1:
         av = (
             x_ca_1["@df['size_term']==0"]
             .apply(lambda x: False if x == 1 else True)
             .astype(np.int8)
+            .to_xarray()
         )
     else:
-        av = 1
+        av = None
 
     assert len(x_co) > 0, "Empty chooser dataframe"
     assert len(x_ca_1) > 0, "Empty alternatives dataframe"
 
-    d = DataFrames(co=x_co, ca=x_ca_1, av=av)
+    d_ca = Dataset.construct.from_idca(x_ca_1)
+    d_co = Dataset.construct.from_idco(x_co)
+    d = d_ca.merge(d_co)
+    if av is not None:
+        d["_avail_"] = av
 
-    m = Model(dataservice=d)
+    m = Model(datatree=d, compute_engine="numba")
     if len(spec.columns) == 4 and all(
         spec.columns == ["Label", "Description", "Expression", "coefficient"]
     ):
@@ -355,11 +379,15 @@ def location_choice_model(
     apply_coefficients(size_coef, m, minimum=-6, maximum=6)
 
     m.choice_co_code = "override_choice"
+    if av is not None:
+        m.availability_ca_var = "_avail_"
+    else:
+        m.availability_any = True
 
     if return_data:
         return (
             m,
-            Dict(
+            LocationChoiceData(
                 edb_directory=Path(edb_directory),
                 alt_values=alt_values,
                 chooser_data=chooser_data,

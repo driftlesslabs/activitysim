@@ -291,15 +291,7 @@ def explicit_value_parameters(model):
         except Exception:
             pass
         else:
-            model.set_value(
-                i,
-                value=j,
-                initvalue=j,
-                nullvalue=j,
-                minimum=j,
-                maximum=j,
-                holdfast=True,
-            )
+            model.lock_value(i, value=j)
 
 
 def apply_coefficients(coefficients, model, minimum=None, maximum=None):
@@ -332,22 +324,19 @@ def apply_coefficients(coefficients, model, minimum=None, maximum=None):
         # assert isinstance(model, AbstractChoiceModel)
         explicit_value_parameters(model)
         for i in coefficients.itertuples():
-            if i.Index in model:
+            if i.Index in model.pnames:
                 holdfast = i.constrain == "T"
                 if holdfast:
-                    minimum_ = i.value
-                    maximum_ = i.value
+                    model.lock_value(i.Index, value=i.value)
                 else:
-                    minimum_ = minimum
-                    maximum_ = maximum
-                model.set_value(
-                    i.Index,
-                    value=i.value,
-                    initvalue=i.value,
-                    holdfast=holdfast,
-                    minimum=minimum_,
-                    maximum=maximum_,
-                )
+                    model.set_value(
+                        i.Index,
+                        value=i.value,
+                        initvalue=i.value,
+                        holdfast=holdfast,
+                        minimum=minimum,
+                        maximum=maximum,
+                    )
 
 
 def apply_coef_template(linear_utility, template_col, condition=None):

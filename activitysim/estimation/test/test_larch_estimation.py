@@ -56,7 +56,7 @@ def _regression_check(dataframe_regression, df, basename=None, rtol=None):
     "name,method",
     [
         ("free_parking", "BHHH"),
-        # ("mandatory_tour_frequency", "SLSQP"),
+        ("mandatory_tour_frequency", "SLSQP"),
         ("joint_tour_frequency", "SLSQP"),
         ("joint_tour_composition", "SLSQP"),
         ("joint_tour_participation", "SLSQP"),
@@ -73,7 +73,7 @@ def test_simple_simulate(est_data, num_regression, dataframe_regression, name, m
     m.load_data()
     m.doctor(repair_ch_av="-")
     loglike_prior = m.loglike()
-    r = m.maximize_loglike(method=method, options={"maxiter": 1000})
+    r = m.maximize_loglike(method=method, options={"maxiter": 1000, "ftol": 1e-9})
     num_regression.check(
         {"loglike_prior": loglike_prior, "loglike_converge": r.loglike},
         basename=f"test_simple_simulate_{name}_{method}_loglike",
@@ -82,50 +82,53 @@ def test_simple_simulate(est_data, num_regression, dataframe_regression, name, m
     _regression_check(dataframe_regression, m.pf)
 
 
-#
-# @pytest.mark.parametrize(
-#     "name,method,rtol",
-#     [
-#         ("workplace_location", "SLSQP", None),
-#         ("school_location", "SLSQP", None),
-#         ("non_mandatory_tour_destination", "SLSQP", None),
-#         ("atwork_subtour_destination", "BHHH", None),
-#         ("trip_destination", "SLSQP", 0.12),
-#         # trip_destination model has unusual parameter variance on a couple
-#         # parameters when switching platforms, possibly related to default data
-#         # types and high standard errors.  Most parameters and the overall
-#         # log likelihoods behave fine, suggesting it is just a numerical
-#         # precision issue.
-#     ],
-# )
-# def test_location_model(
-#     est_data, num_regression, dataframe_regression, name, method, rtol
-# ):
-#     from activitysim.estimation.larch import component_model, update_size_spec
-#
-#     m, data = component_model(name, return_data=True)
-#     m.load_data()
-#     loglike_prior = m.loglike()
-#     r = m.maximize_loglike(method=method, options={"maxiter": 1000})
-#     num_regression.check(
-#         {"loglike_prior": loglike_prior, "loglike_converge": r.loglike},
-#         basename=f"test_loc_{name}_loglike",
-#     )
-#     _regression_check(dataframe_regression, m.pf, rtol=rtol)
-#     size_spec = update_size_spec(
-#         m,
-#         data,
-#         result_dir=None,
-#         output_file=None,
-#     )
-#     dataframe_regression.check(
-#         size_spec,
-#         basename=f"test_loc_{name}_size_spec",
-#         default_tolerance=dict(atol=1e-6, rtol=5e-2)
-#         # set a little loose, as there is sometimes a little variance in these
-#         # results when switching backend implementations.
-#     )
-#
+@pytest.mark.parametrize(
+    "name,method,rtol",
+    [
+        ("workplace_location", "SLSQP", None),
+        ("school_location", "SLSQP", None),
+        ("workplace_location", "BHHH", None),
+        ("school_location", "BHHH", None),
+        ("non_mandatory_tour_destination", "SLSQP", None),
+        ("atwork_subtour_destination", "BHHH", None),
+        ("trip_destination", "BHHH", None),
+        # ("trip_destination", "SLSQP", 0.12),
+        # trip_destination model has unusual parameter variance on a couple
+        # parameters when switching platforms, possibly related to default data
+        # types and high standard errors.  Most parameters and the overall
+        # log likelihoods behave fine, suggesting it is just a numerical
+        # precision issue.
+    ],
+)
+def test_location_model(
+    est_data, num_regression, dataframe_regression, name, method, rtol
+):
+    from activitysim.estimation.larch import component_model, update_size_spec
+
+    m, data = component_model(name, return_data=True)
+    m.load_data()
+    loglike_prior = m.loglike()
+    r = m.maximize_loglike(method=method, options={"maxiter": 1000, "ftol": 1.0e-8})
+    num_regression.check(
+        {"loglike_prior": loglike_prior, "loglike_converge": r.loglike},
+        basename=f"test_loc_{name}_loglike",
+    )
+    _regression_check(dataframe_regression, m.pf, rtol=rtol)
+    size_spec = update_size_spec(
+        m,
+        data,
+        result_dir=None,
+        output_file=None,
+    )
+    dataframe_regression.check(
+        size_spec,
+        basename=f"test_loc_{name}_size_spec",
+        default_tolerance=dict(atol=1e-6, rtol=5e-2)
+        # set a little loose, as there is sometimes a little variance in these
+        # results when switching backend implementations.
+    )
+
+
 #
 # @pytest.mark.parametrize(
 #     "name,method",

@@ -57,7 +57,10 @@ def mode_choice_model(
         purposes.remove("atwork")
 
     # Setup purpose specific models
-    m = {purpose: Model(graph=tree, title=purpose) for purpose in purposes}
+    m = {
+        purpose: Model(graph=tree, title=purpose, compute_engine="numba")
+        for purpose in purposes
+    }
     for alt_code, alt_name in tree.elemental_names().items():
         # Read in base utility function for this alt_name
         u = linear_utility_from_spec(
@@ -76,6 +79,7 @@ def mode_choice_model(
 
     for model in m.values():
         explicit_value_parameters(model)
+        model.availability_ca_var = "_avail_"
     apply_coefficients(coefficients, m)
 
     avail = construct_availability(
@@ -99,6 +103,8 @@ def mode_choice_model(
     from larch.model.model_group import ModelGroup
 
     mg = ModelGroup(m.values())
+    explicit_value_parameters(mg)
+    apply_coefficients(coefficients, mg)
 
     if return_data:
         return (
