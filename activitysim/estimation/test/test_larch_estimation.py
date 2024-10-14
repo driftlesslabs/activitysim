@@ -219,20 +219,20 @@ def test_school_location(est_data, num_regression, dataframe_regression):
     )
 
 
-# def test_cdap_model(est_data, num_regression, dataframe_regression):
-#     from activitysim.estimation.larch.cdap import cdap_model
-#
-#     m = cdap_model()
-#     m.load_data()
-#     loglike_prior = m.loglike()
-#     r = m.maximize_loglike(method="SLSQP", options={"maxiter": 1000})
-#     num_regression.check(
-#         {"loglike_prior": loglike_prior, "loglike_converge": r.loglike},
-#         basename="test_cdap_model_loglike",
-#     )
-#     _regression_check(dataframe_regression, m.pf)
-#
-#
+def test_cdap_model(est_data, num_regression, dataframe_regression):
+    from activitysim.estimation.larch.cdap import cdap_model
+
+    m = cdap_model()
+    m.load_data()
+    loglike_prior = m.loglike()
+    r = m.maximize_loglike(method="SLSQP", options={"maxiter": 1000, "ftol": 1.0e-7})
+    num_regression.check(
+        {"loglike_prior": loglike_prior, "loglike_converge": r.loglike},
+        basename="test_cdap_model_loglike",
+    )
+    _regression_check(dataframe_regression, m.pf)
+
+
 # def test_nonmand_and_joint_tour_dest_choice(
 #     est_data, num_regression, dataframe_regression
 # ):
