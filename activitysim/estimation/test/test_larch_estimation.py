@@ -169,56 +169,56 @@ def test_stop_freq_model(est_data, num_regression, dataframe_regression):
     _regression_check(dataframe_regression, m.pf)
 
 
-# def test_workplace_location(est_data, num_regression, dataframe_regression):
-#     from activitysim.estimation.larch import component_model, update_size_spec
-#
-#     m, data = component_model("workplace_location", return_data=True)
-#     m.load_data()
-#     loglike_prior = m.loglike()
-#     r = m.maximize_loglike(method="SLSQP")
-#     num_regression.check(
-#         {"loglike_prior": loglike_prior, "loglike_converge": r.loglike},
-#         basename="test_workplace_location_loglike",
-#     )
-#     _regression_check(dataframe_regression, m.pf)
-#     size_spec = update_size_spec(
-#         m,
-#         data,
-#         result_dir=None,
-#         output_file=None,
-#     )
-#     dataframe_regression.check(
-#         size_spec,
-#         basename="test_workplace_location_size_spec",
-#         default_tolerance=dict(atol=1e-6, rtol=1e-2),
-#     )
-#
-#
-# def test_school_location(est_data, num_regression, dataframe_regression):
-#     from activitysim.estimation.larch import component_model, update_size_spec
-#
-#     m, data = component_model("school_location", return_data=True)
-#     m.load_data()
-#     loglike_prior = m.loglike()
-#     r = m.maximize_loglike(method="BHHH")
-#     num_regression.check(
-#         {"loglike_prior": loglike_prior, "loglike_converge": r.loglike},
-#         basename="test_school_location_loglike",
-#     )
-#     _regression_check(dataframe_regression, m.pf)
-#     size_spec = update_size_spec(
-#         m,
-#         data,
-#         result_dir=None,
-#         output_file=None,
-#     )
-#     dataframe_regression.check(
-#         size_spec,
-#         basename="test_school_location_size_spec",
-#         default_tolerance=dict(atol=1e-6, rtol=1e-2),
-#     )
-#
-#
+def test_workplace_location(est_data, num_regression, dataframe_regression):
+    from activitysim.estimation.larch import component_model, update_size_spec
+
+    m, data = component_model("workplace_location", return_data=True)
+    m.load_data()
+    loglike_prior = m.loglike()
+    r = m.maximize_loglike(method="SLSQP")
+    num_regression.check(
+        {"loglike_prior": loglike_prior, "loglike_converge": r.loglike},
+        basename="test_workplace_location_loglike",
+    )
+    _regression_check(dataframe_regression, m.pf)
+    size_spec = update_size_spec(
+        m,
+        data,
+        result_dir=None,
+        output_file=None,
+    )
+    dataframe_regression.check(
+        size_spec,
+        basename="test_workplace_location_size_spec",
+        default_tolerance=dict(atol=1e-6, rtol=1e-2),
+    )
+
+
+def test_school_location(est_data, num_regression, dataframe_regression):
+    from activitysim.estimation.larch import component_model, update_size_spec
+
+    m, data = component_model("school_location", return_data=True)
+    m.load_data()
+    loglike_prior = m.loglike()
+    r = m.maximize_loglike(method="BHHH")
+    num_regression.check(
+        {"loglike_prior": loglike_prior, "loglike_converge": r.loglike},
+        basename="test_school_location_loglike",
+    )
+    _regression_check(dataframe_regression, m.pf)
+    size_spec = update_size_spec(
+        m,
+        data,
+        result_dir=None,
+        output_file=None,
+    )
+    dataframe_regression.check(
+        size_spec,
+        basename="test_school_location_size_spec",
+        default_tolerance=dict(atol=1e-6, rtol=1e-2),
+    )
+
+
 # def test_cdap_model(est_data, num_regression, dataframe_regression):
 #     from activitysim.estimation.larch.cdap import cdap_model
 #

@@ -1,4 +1,4 @@
-,value,initvalue,nullvalue,minimum,maximum,best
+param_name,value,initvalue,nullvalue,minimum,maximum,best
 -999,-999,-999,-999,-999,-999,-999
 1,1,1,1,1,1,1
 coef_dist_0_1,-1.0822922946274103,-0.84279999999999999,0,-25,25,-1.0822922946274103
