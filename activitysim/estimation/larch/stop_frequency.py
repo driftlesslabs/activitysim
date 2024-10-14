@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 import os
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import yaml
-from larch import DataFrames, Model
+from larch import Dataset, Model
 from larch.util import Dict
 
 from .general import (
@@ -177,15 +179,19 @@ def stop_frequency_model(
 
         avail = True
 
-        d = DataFrames(
-            co=chooser_data,
-            av=avail,
-            alt_codes=alt_codes,
-            alt_names=alt_names,
+        d = Dataset.construct.from_idco(
+            chooser_data, alts=dict(zip(alt_codes, alt_names))
         )
+        # d = DataFrames(
+        #     co=chooser_data,
+        #     av=avail,
+        #     alt_codes=alt_codes,
+        #     alt_names=alt_names,
+        # )
 
-        m.dataservice = d
+        m.datatree = d
         m.choice_co_code = "override_choice_code"
+        m.availability_any = True
         models.append(m)
 
     from larch.model.model_group import ModelGroup
