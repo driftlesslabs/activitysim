@@ -233,24 +233,24 @@ def test_cdap_model(est_data, num_regression, dataframe_regression):
     _regression_check(dataframe_regression, m.pf)
 
 
-# def test_nonmand_and_joint_tour_dest_choice(
-#     est_data, num_regression, dataframe_regression
-# ):
-#     from activitysim.estimation.larch import component_model
-#
-#     modelname = ("non_mandatory_tour_destination", "joint_tour_destination")
-#     m, d = component_model(modelname, return_data=True)
-#     m.load_data()
-#     m.doctor(repair_ch_av="-")
-#     loglike_prior = m.loglike()
-#     r = m.maximize_loglike(method="SLSQP", options={"maxiter": 1000})
-#     num_regression.check(
-#         {"loglike_prior": loglike_prior, "loglike_converge": r.loglike},
-#         basename="test_nonmand_and_joint_tour_dest_choice_loglike",
-#     )
-#     _regression_check(dataframe_regression, m.pf)
-#
-#
+def test_nonmand_and_joint_tour_dest_choice(
+    est_data, num_regression, dataframe_regression
+):
+    from activitysim.estimation.larch import component_model
+
+    modelname = ("non_mandatory_tour_destination", "joint_tour_destination")
+    m, d = component_model(modelname, return_data=True)
+    m.load_data()
+    m.doctor(repair_ch_av="-")
+    loglike_prior = m.loglike()
+    r = m.maximize_loglike(method="SLSQP", options={"maxiter": 1000})
+    num_regression.check(
+        {"loglike_prior": loglike_prior, "loglike_converge": r.loglike},
+        basename="test_nonmand_and_joint_tour_dest_choice_loglike",
+    )
+    _regression_check(dataframe_regression, m.pf)
+
+
 # def test_tour_and_subtour_mode_choice(est_data, num_regression, dataframe_regression):
 #     from activitysim.estimation.larch.mode_choice import (
 #         atwork_subtour_mode_choice_model,

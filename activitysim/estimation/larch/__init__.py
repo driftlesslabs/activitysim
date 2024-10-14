@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import larch
+import larch as lx
 from packaging.version import Version
 
 from .auto_ownership import auto_ownership_model
@@ -37,6 +37,6 @@ def component_model(name, *args, **kwargs):
             models.append(model)
             all_data.extend(data)
         if all_data:
-            return ModelGroup(models), all_data
+            return lx.ModelGroup(models), all_data
         else:
-            return ModelGroup(models)
+            return lx.ModelGroup(models)
