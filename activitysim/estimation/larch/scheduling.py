@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 from pathlib import Path
 from typing import Collection
@@ -5,7 +7,7 @@ from typing import Collection
 import numpy as np
 import pandas as pd
 import yaml
-from larch import DataFrames, Model, P, X
+from larch import Dataset, Model, P, X
 from larch.util import Dict
 
 from .general import (
@@ -96,7 +98,7 @@ def schedule_choice_model(
     else:
         raise ValueError("cannot find Label or Expression in spec file")
 
-    m = Model()
+    m = Model(compute_engine="numba")
     if len(spec.columns) == 4 and (
         [c.lower() for c in spec.columns]
         == ["label", "description", "expression", "coefficient"]
@@ -158,12 +160,19 @@ def schedule_choice_model(
         joint_unavail = "|".join(f"({i}>0)" for i in unavail_data)
         joint_avail = f"~({joint_unavail})"
     else:
-        joint_avail = 1
+        joint_avail = None
 
-    d = DataFrames(co=x_co, ca=x_ca, av=joint_avail)
-    m.dataservice = d
+    # d = DataFrames(co=x_co, ca=x_ca, av=joint_avail)  # larch 5.7
+    d_ca = Dataset.construct.from_idca(x_ca)
+    d_co = Dataset.construct.from_idco(x_co)
+    d = d_ca.merge(d_co)
+    # if joint_avail is not None:
+    #     d["_avail_"] = joint_avail
+
+    m.datatree = d
     m.choice_co_code = "override_choice_plus1"
-    # m.choice_co_code = "model_choice_plus1"
+    if joint_avail is not None:
+        m.availability_ca_var = joint_avail
 
     if return_data:
         return (

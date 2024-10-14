@@ -129,32 +129,31 @@ def test_location_model(
     )
 
 
-#
-# @pytest.mark.parametrize(
-#     "name,method",
-#     [
-#         ("non_mandatory_tour_scheduling", "SLSQP"),
-#         ("joint_tour_scheduling", "SLSQP"),
-#         # ("atwork_subtour_scheduling", "SLSQP"),  # TODO this test is unstable, needs to be updated with better data
-#         ("mandatory_tour_scheduling_work", "SLSQP"),
-#         ("mandatory_tour_scheduling_school", "SLSQP"),
-#     ],
-# )
-# def test_scheduling_model(est_data, num_regression, dataframe_regression, name, method):
-#     from activitysim.estimation.larch import component_model
-#
-#     m, data = component_model(name, return_data=True)
-#     m.load_data()
-#     m.doctor(repair_ch_av="-")
-#     loglike_prior = m.loglike()
-#     r = m.maximize_loglike(method=method)
-#     num_regression.check(
-#         {"loglike_prior": loglike_prior, "loglike_converge": r.loglike},
-#         basename=f"test_{name}_loglike",
-#     )
-#     _regression_check(dataframe_regression, m.pf)
-#
-#
+@pytest.mark.parametrize(
+    "name,method",
+    [
+        ("non_mandatory_tour_scheduling", "SLSQP"),
+        ("joint_tour_scheduling", "SLSQP"),
+        # ("atwork_subtour_scheduling", "SLSQP"),  # TODO this test is unstable, needs to be updated with better data
+        ("mandatory_tour_scheduling_work", "SLSQP"),
+        ("mandatory_tour_scheduling_school", "SLSQP"),
+    ],
+)
+def test_scheduling_model(est_data, num_regression, dataframe_regression, name, method):
+    from activitysim.estimation.larch import component_model
+
+    m, data = component_model(name, return_data=True)
+    m.load_data()
+    m.doctor(repair_ch_av="-")
+    loglike_prior = m.loglike()
+    r = m.maximize_loglike(method=method, options={"maxiter": 1000, "ftol": 1.0e-9})
+    num_regression.check(
+        {"loglike_prior": loglike_prior, "loglike_converge": r.loglike},
+        basename=f"test_{name}_loglike",
+    )
+    _regression_check(dataframe_regression, m.pf)
+
+
 # def test_stop_freq_model(est_data, num_regression, dataframe_regression):
 #     from activitysim.estimation.larch import component_model
 #

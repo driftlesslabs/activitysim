@@ -1,4 +1,4 @@
-,value,initvalue,nullvalue,minimum,maximum,best
+param_name,value,initvalue,nullvalue,minimum,maximum,best
 coef_adjacent_window_exists_after_this_arrival_hour_first_tour_interaction,0.4470328861441506,-0.025700000000000001,0,-25,25,0.4470328861441506
 coef_adjacent_window_exists_after_this_arrival_hour_second_plus_tour_interaction,0.56540266502429914,-0.02734,0,-25,25,0.56540266502429914
 coef_adjacent_window_exists_before_this_departure_hour_first_tour_interaction,1.0259323894447316,0.0084419999999999999,0,-25,25,1.0259323894447316

@@ -13,7 +13,7 @@ from .location_choice import *
 from .mode_choice import *
 
 # from .nonmand_tour_freq import *
-# from .scheduling import *
+from .scheduling import *
 from .simple_simulate import *
 
 # require larch version 6.0.0 or later
