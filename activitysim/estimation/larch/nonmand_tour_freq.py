@@ -1,14 +1,15 @@
+from __future__ import annotations
+
 import logging
 import os
+import pickle
+from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
 import yaml
-from larch import DataFrames, Model
-from larch.log import logger_name
+from larch import Dataset, Model
 from larch.util import Dict
-import pickle
-from datetime import datetime
 
 from .general import (
     apply_coefficients,
@@ -17,7 +18,7 @@ from .general import (
     remove_apostrophes,
 )
 
-_logger = logging.getLogger(logger_name)
+_logger = logging.getLogger("larch")
 
 
 def interaction_simulate_data(
@@ -113,7 +114,7 @@ def link_same_value_coefficients(segment_names, coefficients, spec):
 
 
 def unavail_parameters(model):
-    return model.pf.index[(model.pf.value < -900) & (model.pf.holdfast != 0)]
+    return model.pnames[(model.pvals < -900) & (model.pholdfast != 0)]
 
 
 def unavail_data_cols(model):
@@ -246,7 +247,7 @@ def nonmand_tour_freq_model(
     m = {}
     for segment_name in segment_names:
         print(f"Creating larch model for {segment_name}")
-        segment_model = m[segment_name] = Model()
+        segment_model = m[segment_name] = Model(compute_engine="numba")
         # One of the alternatives is coded as 0, so
         # we need to explicitly initialize the MNL nesting graph
         # and set to root_id to a value other than zero.
@@ -276,12 +277,16 @@ def nonmand_tour_freq_model(
             num_chunks=num_chunks,
         )
 
-        d = DataFrames(
-            co=x_co,
-            ca=x_ca,
-            av=~unavail(segment_model, x_ca),
+        d_co = Dataset.construct.from_idco(
+            x_co,
+            alts=alt_def.index.rename("altid"),
         )
-        m[segment_name].dataservice = d
+        x_ca["_avail_"] = ~unavail(segment_model, x_ca)
+        # we set crack to False here so that we do not dissolve zero variance IDCAs
+        d_ca = Dataset.construct.from_idca(x_ca, crack=False)
+        d = d_ca.merge(d_co)
+        m[segment_name].datatree = d
+        m[segment_name].availability_ca_var = "_avail_"
 
     if return_data:
         return m, data

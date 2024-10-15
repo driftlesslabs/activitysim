@@ -1,6 +1,6 @@
-,value,initvalue,nullvalue,minimum,maximum,best
--999,-999,-999,-999,-999,-999,-999
-1,1,1,1,1,1,1
+param_name,value,initvalue,nullvalue,minimum,maximum,best
+-999,-999,-999,0,-999,-999,-999
+1,1,1,0,1,1,1
 bike_ASC_auto_deficient_eatout,-95.05184217157273,-1.5691105999999999,0,,,-95.05184217157273
 bike_ASC_auto_sufficient_eatout,-1.464117844170342,-1.2003470999999999,0,,,-1.464117844170342
 bike_ASC_no_auto_eatout,7.2018489969700603,0.86807095999999995,0,,,7.2018489969700603
