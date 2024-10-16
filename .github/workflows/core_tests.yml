@@ -26,13 +26,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Mambaforge
+      - name: Setup Miniforge
         uses: conda-incubator/setup-miniconda@v3
         with:
-            miniforge-variant: Mambaforge
             miniforge-version: latest
             activate-environment: asim-test
-            use-mamba: true
             python-version: ${{ matrix.python-version }}
 
       - name: Set cache date for year and month
@@ -46,7 +44,7 @@ jobs:
 
       - name: Update environment
         run: |
-          mamba env update -n asim-test -f conda-environments/github-actions-tests.yml
+          conda env update -n asim-test -f conda-environments/github-actions-tests.yml
         if: steps.cache.outputs.cache-hit != 'true'
 
       - name: Install activitysim
@@ -58,8 +56,8 @@ jobs:
 
       - name: Conda checkup
         run: |
-          mamba info -a
-          mamba list
+          conda info -a
+          conda list
 
       - name: Lint with Black
         run: |
@@ -111,13 +109,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Mambaforge
+      - name: Setup Miniforge
         uses: conda-incubator/setup-miniconda@v3
         with:
-            miniforge-variant: Mambaforge
             miniforge-version: latest
             activate-environment: asim-test
-            use-mamba: true
             python-version: ${{ matrix.python-version }}
 
       - name: Set cache date for year and month
@@ -131,7 +127,7 @@ jobs:
 
       - name: Update environment
         run: |
-          mamba env update -n asim-test -f conda-environments/github-actions-tests.yml
+          conda env update -n asim-test -f conda-environments/github-actions-tests.yml
         if: steps.cache.outputs.cache-hit != 'true'
 
       - name: Install activitysim
@@ -143,8 +139,8 @@ jobs:
 
       - name: Conda checkup
         run: |
-          mamba info -a
-          mamba list
+          conda info -a
+          conda list
 
       - name: Lint with Black
         run: |
@@ -194,13 +190,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Mambaforge
+      - name: Setup Miniforge
         uses: conda-incubator/setup-miniconda@v3
         with:
-          miniforge-variant: Mambaforge
           miniforge-version: latest
           activate-environment: asim-test
-          use-mamba: true
           python-version: ${{ env.python-version }}
 
       - name: Set cache date for year and month
@@ -214,7 +208,7 @@ jobs:
 
       - name: Update environment
         run: |
-          mamba env update -n asim-test -f conda-environments/github-actions-tests.yml
+          conda env update -n asim-test -f conda-environments/github-actions-tests.yml
         if: steps.cache.outputs.cache-hit != 'true'
 
       - name: Install activitysim
@@ -226,8 +220,8 @@ jobs:
 
       - name: Conda checkup
         run: |
-          mamba info -a
-          mamba list
+          conda info -a
+          conda list
 
       # TODO: Cache sharrow compiled flows?  The contents of __pycache__ appear to
       #       be ignored, so this is not working as expected right now
@@ -282,13 +276,11 @@ jobs:
       - name: Checkout ActivitySim
         uses: actions/checkout@v4
 
-      - name: Setup Mambaforge
+      - name: Setup Miniforge
         uses: conda-incubator/setup-miniconda@v3
         with:
-          miniforge-variant: Mambaforge
           miniforge-version: latest
           activate-environment: asim-test
-          use-mamba: true
           python-version: ${{ env.python-version }}
 
       - name: Set cache date for year and month
@@ -304,7 +296,7 @@ jobs:
 
       - name: Update environment
         run: |
-          mamba env update -n asim-test -f conda-environments/github-actions-tests.yml
+          conda env update -n asim-test -f conda-environments/github-actions-tests.yml
         if: steps.cache.outputs.cache-hit != 'true'
 
       - name: Install activitysim
@@ -316,8 +308,8 @@ jobs:
 
       - name: Conda checkup
         run: |
-          mamba info -a
-          mamba list
+          conda info -a
+          conda list
 
       - name: Checkout Example
         uses: actions/checkout@v4
@@ -345,13 +337,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Mambaforge
+      - name: Setup Miniforge
         uses: conda-incubator/setup-miniconda@v3
         with:
-          miniforge-variant: Mambaforge
           miniforge-version: latest
           activate-environment: asim-test
-          use-mamba: true
           python-version: ${{ env.python-version }}
 
       - name: Set cache date for year and month
@@ -365,7 +355,7 @@ jobs:
 
       - name: Update environment
         run: |
-          mamba env update -n asim-test -f conda-environments/github-actions-tests.yml
+          conda env update -n asim-test -f conda-environments/github-actions-tests.yml
         if: steps.cache.outputs.cache-hit != 'true'
 
       - name: Install activitysim
@@ -377,8 +367,8 @@ jobs:
 
       - name: Conda checkup
         run: |
-          mamba info -a
-          mamba list
+          conda info -a
+          conda list
 
       - name: Test Random Seed Generation
         run: |
@@ -397,13 +387,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Mambaforge
+      - name: Setup Miniforge
         uses: conda-incubator/setup-miniconda@v3
         with:
-          miniforge-variant: Mambaforge
           miniforge-version: latest
           activate-environment: asim-test
-          use-mamba: true
           python-version: ${{ env.python-version }}
 
       - name: Set cache date for year and month
@@ -417,11 +405,11 @@ jobs:
 
       - name: Update environment
         run: |
-          mamba env update -n asim-test -f conda-environments/github-actions-tests.yml
+          conda env update -n asim-test -f conda-environments/github-actions-tests.yml
         if: steps.cache.outputs.cache-hit != 'true'
 
-      - name: Install Larch
-        run: mamba install "larch>=5.7.1"
+      - name: Install Larch v6
+        run: python -m pip install git+https://github.com/driftlesslabs/larch.git
 
       - name: Install activitysim
         # installing without dependencies is faster, we trust that all needed dependencies
@@ -432,14 +420,14 @@ jobs:
 
       - name: Conda checkup
         run: |
-          mamba info -a
-          mamba list
+          conda info -a
+          conda list
 
       - name: Test Estimation Mode
         run: |
           python -m pytest activitysim/estimation/test/test_larch_estimation.py --durations=0
-  
-  
+
+
   estimation_edb_creation:
     needs: foundation
     env:
@@ -453,13 +441,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Mambaforge
+      - name: Setup Miniforge
         uses: conda-incubator/setup-miniconda@v3
         with:
-          miniforge-variant: Mambaforge
           miniforge-version: latest
           activate-environment: asim-test
-          use-mamba: true
           python-version: ${{ env.python-version }}
 
       - name: Set cache date for year and month
@@ -473,7 +459,7 @@ jobs:
 
       - name: Update environment
         run: |
-          mamba env update -n asim-test -f conda-environments/github-actions-tests.yml
+          conda env update -n asim-test -f conda-environments/github-actions-tests.yml
         if: steps.cache.outputs.cache-hit != 'true'
 
       - name: Install activitysim
@@ -485,8 +471,8 @@ jobs:
 
       - name: Conda checkup
         run: |
-          mamba info -a
-          mamba list
+          conda info -a
+          conda list
 
       - name: Test Estimation EDB Creation
         run: |
@@ -511,9 +497,7 @@ jobs:
       - name: Install dependencies
         uses: conda-incubator/setup-miniconda@v3
         with:
-          miniforge-variant: Mambaforge
           miniforge-version: latest
-          use-mamba: true
           environment-file: conda-environments/docbuild.yml
           python-version: "3.10"
           activate-environment: docbuild
