@@ -6,11 +6,10 @@ import logging
 import os
 import shutil
 from pathlib import Path
-from typing import Any, Literal
+from typing import Literal
 
 import pandas as pd
-import yaml
-from pydantic import BaseModel, class_validators, model_validator
+from pydantic import model_validator
 
 from activitysim.core import simulate, workflow
 from activitysim.core.configuration import PydanticReadable
@@ -514,7 +513,7 @@ class Estimator:
         assert self.estimating
 
         if isinstance(model_settings, PydanticBase):
-            model_settings = model_settings.dict()
+            model_settings = model_settings.model_dump()
         coefficients_df = simulate.read_model_coefficient_template(
             self.state.filesystem, model_settings
         )
@@ -587,7 +586,7 @@ class Estimator:
             )
             assert not os.path.isfile(file_path)
             with open(file_path, "w") as f:
-                safe_dump(model_settings.dict(), f)
+                safe_dump(model_settings.model_dump(), f)
         else:
             if "include_settings" in model_settings:
                 file_path = self.output_file_path(
@@ -882,7 +881,7 @@ class EstimationManager(object):
                 "EstimationManager. get_survey_table: survey table '%s' not in survey_tables"
                 % table_name
             )
-        df = self.survey_tables[table_name].get("df")
+        df = self.survey_tables[table_name].df
         return df
 
     def get_survey_values(self, model_values, table_name, column_names):
