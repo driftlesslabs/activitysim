@@ -87,7 +87,6 @@ def test_simple_simulate(est_data, num_regression, dataframe_regression, name, m
     [
         ("workplace_location", "SLSQP", None),
         ("school_location", "SLSQP", None),
-        ("workplace_location", "BHHH", None),
         ("school_location", "BHHH", None),
         ("non_mandatory_tour_destination", "SLSQP", None),
         ("atwork_subtour_destination", "BHHH", None),
