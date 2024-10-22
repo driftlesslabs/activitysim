@@ -165,9 +165,9 @@ def stop_frequency_model(
 
         if settings.get("LOGIT_TYPE") == "NL":
             tree = construct_nesting_tree(data.alt_names[n], settings["NESTS"])
-            m = Model(graph=tree)
+            m = Model(graph=tree, compute_engine="numba")
         else:
-            m = Model()
+            m = Model(compute_engine="numba")
 
         m.utility_co = dict_of_linear_utility_from_spec(
             spec,
