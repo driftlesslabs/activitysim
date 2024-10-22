@@ -150,7 +150,7 @@ def schedule_choice_model(
     #     x_co["_segment_label"] = size_spec.index[0]
 
     alt_codes = np.arange(len(x_ca.index.levels[1])) + 1
-    x_ca.index = x_ca.index.set_levels(alt_codes, 1)
+    x_ca.index = x_ca.index.set_levels(alt_codes, level=1)
     x_co["override_choice_plus1"] = x_co["override_choice"] + 1
     x_co["model_choice_plus1"] = x_co["model_choice"] + 1
 
