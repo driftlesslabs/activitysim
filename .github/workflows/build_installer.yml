@@ -47,7 +47,7 @@ jobs:
       shell: bash
 
     - name: Upload installer to Github artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         path: build/Activitysim-${{ inputs.version }}-${{ matrix.OS_NAME }}-${{ matrix.ARCH }}*
         name: Activitysim-${{ inputs.version }}-${{ matrix.OS_NAME }}-${{ matrix.ARCH }}
