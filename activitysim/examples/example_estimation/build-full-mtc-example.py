@@ -52,6 +52,7 @@ def download_example(download_dir):
 
 
 def main(working_dir: Path, household_sample_size: int):
+    working_dir = Path(working_dir)
     working_dir.mkdir(parents=True, exist_ok=True)
 
     script_dir = Path(__file__).resolve().parent
