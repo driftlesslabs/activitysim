@@ -1,0 +1,161 @@
+"""
+This script builds estimation data bundles for the full MTC example for ActivitySim.
+
+It downloads the necessary example data, runs the ActivitySim model with specified configurations,
+and processes the output data. The script accepts the working directory and household sample size
+as command-line arguments.
+
+Functions:
+    download_example(download_dir: Path) -> Path:
+        Downloads the prototype MTC extended example data to the specified directory.
+
+    main(working_dir: Path, household_sample_size: int):
+        Main function that sets up directories, runs the ActivitySim model, and processes the output data.
+
+Usage:
+    python build-full-mtc.py -d <working_directory> -s <household_sample_size>
+
+Arguments:
+    -d, --directory: Directory to use as the working directory. Defaults to '/tmp/edb-test'.
+    -s, --household_sample_size: Household sample size. Defaults to 2000.
+"""
+
+from __future__ import annotations
+
+import argparse
+import os
+import shutil
+import subprocess
+from pathlib import Path
+
+from activitysim.examples.external import download_external_example
+
+
+def download_example(download_dir):
+    example_dir = download_external_example(
+        name="prototype_mtc_extended",
+        working_dir=download_dir,
+        url="https://github.com/ActivitySim/activitysim-prototype-mtc/archive/refs/heads/extended.tar.gz",
+        assets={
+            "data_full.tar.zst": {
+                "url": "https://github.com/ActivitySim/activitysim-prototype-mtc/releases/download/v1.3.4/data_full.tar.zst",
+                "sha256": "b402506a61055e2d38621416dd9a5c7e3cf7517c0a9ae5869f6d760c03284ef3",
+                "unpack": "data_full",
+            },
+            "test/prototype_mtc_reference_pipeline.zip": {
+                "url": "https://github.com/ActivitySim/activitysim-prototype-mtc/releases/download/v1.3.2/prototype_mtc_extended_reference_pipeline.zip",
+                "sha256": "4d94b6a8a83225dda17e9ca19c9110bc1df2df5b4b362effa153d1c8d31524f5",
+            },
+        },
+    )
+    return example_dir
+
+
+def main(working_dir: Path, household_sample_size: int):
+    working_dir.mkdir(parents=True, exist_ok=True)
+
+    script_dir = Path(__file__).resolve().parent
+    infer_py = script_dir / "scripts" / "infer.py"
+
+    print(f'The current CONDA environment is {os.getenv("CONDA_DEFAULT_ENV")}')
+
+    download_example(working_dir)
+
+    configs_dir = working_dir / "activitysim-prototype-mtc-extended" / "configs"
+    full_data_dir = working_dir / "activitysim-prototype-mtc-extended" / "data_full"
+    pseudosurvey_dir = working_dir / "activitysim-prototype-mtc-extended" / "output"
+
+    subprocess.run(
+        [
+            "python",
+            "-m",
+            "activitysim",
+            "run",
+            "-c",
+            str(configs_dir),
+            "-d",
+            str(full_data_dir),
+            "-o",
+            str(pseudosurvey_dir),
+            "--households_sample_size",
+            str(household_sample_size),
+        ],
+        check=True,
+    )
+
+    survey_data_dir = pseudosurvey_dir / "survey_data"
+    survey_data_dir.mkdir(parents=True, exist_ok=True)
+
+    for file in pseudosurvey_dir.glob("final_*.csv"):
+        subprocess.run(["cp", str(file), str(survey_data_dir)], check=True)
+
+    files_to_copy = [
+        "final_households.csv",
+        "final_persons.csv",
+        "final_tours.csv",
+        "final_joint_tour_participants.csv",
+        "final_trips.csv",
+    ]
+
+    for file_name in files_to_copy:
+        src = pseudosurvey_dir / file_name
+        dest = survey_data_dir / file_name.replace("final_", "survey_")
+        shutil.copy(src, dest)
+
+    output_dir = working_dir / "infer-output"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    subprocess.run(
+        [
+            "python",
+            str(infer_py),
+            str(pseudosurvey_dir),
+            str(configs_dir),
+            str(output_dir),
+        ],
+        check=True,
+    )
+
+    for file in output_dir.glob("override_*.csv"):
+        subprocess.run(["cp", str(file), str(full_data_dir)], check=True)
+
+    edb_dir = working_dir / "activitysim-prototype-mtc-extended" / "output-est-mode"
+    edb_dir.mkdir(parents=True, exist_ok=True)
+
+    subprocess.run(
+        [
+            "python",
+            "-m",
+            "activitysim",
+            "run",
+            "-c",
+            str(script_dir / "configs_estimation"),
+            "-c",
+            str(configs_dir),
+            "-d",
+            str(full_data_dir),
+            "-o",
+            str(edb_dir),
+        ],
+        check=True,
+    )
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Build the full MTC example.")
+    parser.add_argument(
+        "-d",
+        "--directory",
+        type=str,
+        default="/tmp/edb-test",
+        help="Directory to use as the working directory. Defaults to '/tmp/edb-test'.",
+    )
+    parser.add_argument(
+        "-s",
+        "--household_sample_size",
+        type=int,
+        default=2000,
+        help="Household sample size. Defaults to 2000.",
+    )
+    args = parser.parse_args()
+    main(args.directory, args.household_sample_size)
