@@ -655,6 +655,7 @@ class Estimator:
             # this loses the alt_id information, but drops all of the empty columns
             # (can still get empty columns if not every chooser has same number of alts)
             # (this can happen if the pick count > 1 and/or sampled alts are not included)
+            melt_df["_original_" + alt_id_name] = melt_df[alt_id_name]
             melt_df[alt_id_name] = melt_df.groupby([chooser_name, variable_column])[
                 alt_id_name
             ].cumcount()
