@@ -650,12 +650,28 @@ class Estimator:
         output_format = self.settings.EDB_ALTS_FILE_FORMAT
         assert output_format in ["verbose", "compact"]
 
+        original_alt_ids = None
         if output_format == "compact":
+            # preserve the original alt_ids in the EDB output
+            original_alt_ids = melt_df[[chooser_name, alt_id_name]].drop_duplicates(
+                ignore_index=True
+            )
+            original_alt_ids = original_alt_ids.set_index(
+                [chooser_name, alt_id_name], drop=False
+            )[alt_id_name]
+            original_alt_ids.index = pd.MultiIndex.from_arrays(
+                [
+                    original_alt_ids.index.get_level_values(0),
+                    original_alt_ids.groupby(level=0).cumcount(),
+                ],
+                names=[chooser_name, alt_id_name],
+            )
+            original_alt_ids = original_alt_ids.unstack(1, fill_value=-1)
+
             # renumber the alt_id column to just count from 1 to n
             # this loses the alt_id information, but drops all of the empty columns
             # (can still get empty columns if not every chooser has same number of alts)
             # (this can happen if the pick count > 1 and/or sampled alts are not included)
-            melt_df["_original_" + alt_id_name] = melt_df[alt_id_name]
             melt_df[alt_id_name] = melt_df.groupby([chooser_name, variable_column])[
                 alt_id_name
             ].cumcount()
@@ -664,7 +680,13 @@ class Estimator:
             [chooser_name, variable_column, alt_id_name]
         ).unstack(2)
         melt_df.columns = melt_df.columns.droplevel(0)
-        melt_df = melt_df.reset_index(1)
+        if original_alt_ids is not None:
+            original_alt_ids.index = pd.MultiIndex.from_arrays(
+                [original_alt_ids.index, pd.Index(["alt_id"] * len(original_alt_ids))],
+                names=melt_df.index.names,
+            )
+            melt_df = pd.concat([melt_df, original_alt_ids], axis=0)
+        melt_df = melt_df.sort_index().reset_index(1)
 
         # person_id,expression,1,2,3,4,5,...
         # 31153,util_dist_0_1,0.75,0.46,0.27,0.63,0.48,...
