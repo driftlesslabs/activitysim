@@ -9,7 +9,7 @@ import pandas as pd
 
 from activitysim.abm.models.util import logsums as logsum
 from activitysim.abm.tables.size_terms import tour_destination_size_terms
-from activitysim.core import estimation, config, los, simulate, tracing, workflow
+from activitysim.core import config, estimation, los, simulate, tracing, workflow
 from activitysim.core.configuration.logit import TourLocationComponentSettings
 from activitysim.core.interaction_sample import interaction_sample
 from activitysim.core.interaction_sample_simulate import interaction_sample_simulate
@@ -312,7 +312,10 @@ def choose_MAZ_for_TAZ(state: workflow.State, taz_sample, MAZ_size_terms, trace_
     assert (
         (taz_choices[chooser_id_col] == np.repeat(chooser_df.index, taz_sample_size))
         # can get one extra if sampling in estimation mode
-        | (taz_choices[chooser_id_col] == np.repeat(chooser_df.index, taz_sample_size + 1))
+        | (
+            taz_choices[chooser_id_col]
+            == np.repeat(chooser_df.index, taz_sample_size + 1)
+        )
     ).all()
 
     # we need to choose a MAZ for each DEST_TAZ choice

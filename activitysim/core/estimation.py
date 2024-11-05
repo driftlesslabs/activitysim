@@ -953,7 +953,7 @@ class EstimationManager(object):
         if "accessibilities" in trace_label:
             # accessibilities models to not have survey values
             return None
-        
+
         model = trace_label.split(".")[0]
         if model == "school_location":
             survey_choices = manager.get_survey_values(
