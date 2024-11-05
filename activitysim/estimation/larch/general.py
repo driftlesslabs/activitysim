@@ -70,7 +70,12 @@ def cv_to_ca(alt_values, dtype="float64", required_labels=None):
             x_ca_tall = x_ca_tall.astype(dtype)
 
     # Unstack the variables dimension
-    x_ca = x_ca_tall.unstack(1)
+    x_ca = (
+        x_ca_tall.reset_index()
+        .drop_duplicates()
+        .set_index(x_ca_tall.index.names)
+        .unstack(1)
+    )
 
     # Code above added a dummy top level to columns, remove it here.
     x_ca.columns = x_ca.columns.droplevel(0)
