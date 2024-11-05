@@ -8,14 +8,14 @@ import numpy as np
 import pandas as pd
 
 from activitysim.core import (
-    estimation,
     chunk,
+    estimation,
     interaction_simulate,
     logit,
     simulate,
     tracing,
-    workflow,
     util,
+    workflow,
 )
 from activitysim.core.configuration.base import ComputeSettings
 from activitysim.core.skim_dataset import DatasetWrapper
@@ -538,9 +538,11 @@ def _interaction_sample(
                     how="left",
                 )
                 if missing_choices.prob.isna().sum() > 0:
-                    logger.warning(f"Survey choices with no probs:\n {missing_choices[missing_choices.prob.isna()]}")
+                    logger.warning(
+                        f"Survey choices with no probs:\n {missing_choices[missing_choices.prob.isna()]}"
+                    )
                 del probs_df
-                missing_choices['prob'].fillna(0, inplace=True)
+                missing_choices["prob"].fillna(0, inplace=True)
                 # random number is not important, filling with 0
                 missing_choices["rand"] = 0
                 # merge survey choices back into choices_df and sort by chooser
