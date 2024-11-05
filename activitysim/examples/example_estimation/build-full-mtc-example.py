@@ -55,7 +55,7 @@ def download_example(download_dir):
     return example_dir
 
 
-def main(working_dir: Path, household_sample_size: int):
+def main(working_dir: Path, household_sample_size: int, skip_to_edb: bool = False):
     working_dir = Path(working_dir)
     working_dir.mkdir(parents=True, exist_ok=True)
 
@@ -64,65 +64,67 @@ def main(working_dir: Path, household_sample_size: int):
 
     print(f'The current CONDA environment is {os.getenv("CONDA_DEFAULT_ENV")}')
 
-    download_example(working_dir)
-
     configs_dir = working_dir / "activitysim-prototype-mtc-extended" / "configs"
     full_data_dir = working_dir / "activitysim-prototype-mtc-extended" / "data_full"
     pseudosurvey_dir = working_dir / "activitysim-prototype-mtc-extended" / "output"
 
-    subprocess.run(
-        [
-            "python",
-            "-m",
-            "activitysim",
-            "run",
-            "-c",
-            str(configs_dir),
-            "-d",
-            str(full_data_dir),
-            "-o",
-            str(pseudosurvey_dir),
-            "--households_sample_size",
-            str(household_sample_size),
-        ],
-        check=True,
-    )
+    if not skip_to_edb:
 
-    survey_data_dir = pseudosurvey_dir / "survey_data"
-    survey_data_dir.mkdir(parents=True, exist_ok=True)
+        download_example(working_dir)
 
-    for file in pseudosurvey_dir.glob("final_*.csv"):
-        subprocess.run(["cp", str(file), str(survey_data_dir)], check=True)
+        subprocess.run(
+            [
+                "python",
+                "-m",
+                "activitysim",
+                "run",
+                "-c",
+                str(configs_dir),
+                "-d",
+                str(full_data_dir),
+                "-o",
+                str(pseudosurvey_dir),
+                "--households_sample_size",
+                str(household_sample_size),
+            ],
+            check=True,
+        )
 
-    files_to_copy = [
-        "final_households.csv",
-        "final_persons.csv",
-        "final_tours.csv",
-        "final_joint_tour_participants.csv",
-        "final_trips.csv",
-    ]
+        survey_data_dir = pseudosurvey_dir / "survey_data"
+        survey_data_dir.mkdir(parents=True, exist_ok=True)
 
-    for file_name in files_to_copy:
-        src = pseudosurvey_dir / file_name
-        dest = survey_data_dir / file_name.replace("final_", "survey_")
-        shutil.copy(src, dest)
+        for file in pseudosurvey_dir.glob("final_*.csv"):
+            shutil.copy(str(file), str(survey_data_dir))
 
-    output_dir = working_dir / "infer-output"
-    output_dir.mkdir(parents=True, exist_ok=True)
+        files_to_copy = [
+            "final_households.csv",
+            "final_persons.csv",
+            "final_tours.csv",
+            "final_joint_tour_participants.csv",
+            "final_trips.csv",
+        ]
 
-    subprocess.run(
-        [
-            "python",
-            str(infer_py),
-            str(pseudosurvey_dir),
-            str(configs_dir),
-            str(output_dir),
-        ],
-        check=True,
-    )
+        for file_name in files_to_copy:
+            src = pseudosurvey_dir / file_name
+            dest = survey_data_dir / file_name.replace("final_", "survey_")
+            shutil.copy(src, dest)
 
-    for file in output_dir.glob("override_*.csv"):
-        subprocess.run(["cp", str(file), str(full_data_dir)], check=True)
+        output_dir = working_dir / "infer-output"
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        subprocess.run(
+            [
+                "python",
+                str(infer_py),
+                str(pseudosurvey_dir),
+                str(configs_dir),
+                str(output_dir),
+            ],
+            check=True,
+        )
+
+        for file in output_dir.glob("override_*.csv"):
+            shutil.copy(str(file), str(full_data_dir))
 
     edb_dir = working_dir / "activitysim-prototype-mtc-extended" / "output-est-mode"
     edb_dir.mkdir(parents=True, exist_ok=True)
@@ -162,5 +164,10 @@ if __name__ == "__main__":
         default=2000,
         help="Household sample size. Defaults to 2000.",
     )
+    parser.add_argument(
+        "--skip_to_edb",
+        action="store_true",
+        help="Skip to EDB step. Defaults to False.",
+    )
     args = parser.parse_args()
-    main(args.directory, args.household_sample_size)
+    main(args.directory, args.household_sample_size, args.skip_to_edb)
