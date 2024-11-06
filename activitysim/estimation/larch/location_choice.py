@@ -292,8 +292,10 @@ def location_choice_model(
     try:
         if "alt_id" in x_ca:
             x_ca_1 = pd.merge(x_ca, landuse, left_on="alt_id", right_index=True)
+            choice_def = {"choice_ca_var": "override_choice == alt_id"}
         else:
             x_ca_1 = pd.merge(x_ca, landuse, on="zone_id", how="left")
+            choice_def = {"choice_co_code": "override_choice"}
     except KeyError:
         # Missing the zone_id variable?
         # Use the alternative id's instead, which assumes no sampling of alternatives
@@ -304,6 +306,7 @@ def location_choice_model(
             right_index=True,
             how="left",
         )
+        choice_def = {"choice_co_code": "override_choice"}
 
     x_ca_1 = x_ca_1.sort_index()
 
@@ -395,7 +398,7 @@ def location_choice_model(
     apply_coefficients(coefficients, m, minimum=-25, maximum=25)
     apply_coefficients(size_coef, m, minimum=-6, maximum=6)
 
-    m.choice_co_code = "override_choice"
+    m.choice_def(choice_def)
     if av is not None:
         m.availability_ca_var = "_avail_"
     else:
