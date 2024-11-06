@@ -290,7 +290,10 @@ def location_choice_model(
 
     # Merge land use characteristics into CA data
     try:
-        x_ca_1 = pd.merge(x_ca, landuse, on="zone_id", how="left")
+        if "alt_id" in x_ca:
+            x_ca_1 = pd.merge(x_ca, landuse, left_on="alt_id", right_index=True)
+        else:
+            x_ca_1 = pd.merge(x_ca, landuse, on="zone_id", how="left")
     except KeyError:
         # Missing the zone_id variable?
         # Use the alternative id's instead, which assumes no sampling of alternatives
@@ -301,7 +304,8 @@ def location_choice_model(
             right_index=True,
             how="left",
         )
-    x_ca_1.index = x_ca.index
+
+    x_ca_1 = x_ca_1.sort_index()
 
     # Availability of choice zones
     if "util_no_attractions" in x_ca_1:
@@ -331,6 +335,15 @@ def location_choice_model(
         d["_avail_"] = av
 
     m = Model(datatree=d, compute_engine="numba")
+
+    # One of the alternatives might be coded as 0, so
+    # we need to explicitly initialize the MNL nesting graph
+    # and set to root_id to a value other than zero.
+    root_id = 0
+    if root_id in d.dc.altids():
+        root_id = -1
+    m.initialize_graph(alternative_codes=d.dc.altids(), root_id=root_id)
+
     if len(spec.columns) == 4 and all(
         spec.columns == ["Label", "Description", "Expression", "coefficient"]
     ):
