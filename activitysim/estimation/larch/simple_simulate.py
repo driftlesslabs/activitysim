@@ -83,8 +83,12 @@ def simple_simulate_data(
     edb_directory = edb_directory.format(name=name)
 
     def _read_csv(filename, **kwargs):
-        filename = filename.format(name=name)
-        return pd.read_csv(os.path.join(edb_directory, filename), **kwargs)
+        filename = Path(edb_directory).joinpath(filename.format(name=name))
+        if filename.with_suffix(".parquet").exists():
+            print("loading from", filename.with_suffix(".parquet"))
+            return pd.read_parquet(filename.with_suffix(".parquet"), **kwargs)
+        print("loading from", filename)
+        return pd.read_csv(filename, **kwargs)
 
     settings_file = settings_file.format(name=name)
     with open(os.path.join(edb_directory, settings_file)) as yf:
@@ -122,8 +126,7 @@ def simple_simulate_data(
 
         chooser_data = _read_csv(
             chooser_data_file,
-            index_col=values_index_col,
-        )
+        ).set_index(values_index_col)
 
     except Exception:
         # when an error happens in reading anything other than settings, print settings

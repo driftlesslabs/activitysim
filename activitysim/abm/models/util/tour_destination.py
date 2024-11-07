@@ -9,7 +9,7 @@ import pandas as pd
 
 from activitysim.abm.models.util import logsums as logsum
 from activitysim.abm.tables.size_terms import tour_destination_size_terms
-from activitysim.core import estimation, config, los, simulate, tracing, workflow
+from activitysim.core import config, estimation, los, simulate, tracing, workflow
 from activitysim.core.configuration.logit import TourLocationComponentSettings
 from activitysim.core.interaction_sample import interaction_sample
 from activitysim.core.interaction_sample_simulate import interaction_sample_simulate
@@ -181,39 +181,6 @@ def destination_sample(
         trace_label=trace_label,
     )
 
-    # adding observed choice to alt set when running in estimation mode
-    if estimator:
-        # grabbing survey values
-        survey_tours = estimation.manager.get_survey_table("tours")
-        survey_choices = survey_tours[["destination", "person_id"]].reset_index()
-        survey_choices.columns = ["tour_id", alt_dest_col_name, "person_id"]
-        survey_choices = survey_choices[
-            survey_choices["tour_id"].isin(choices.index)
-            & (survey_choices[alt_dest_col_name] > 0)
-        ]
-        # merging survey destination into table if not available
-        joined_data = survey_choices.merge(
-            choices,
-            on=["tour_id", alt_dest_col_name, "person_id"],
-            how="left",
-            indicator=True,
-        )
-        missing_rows = joined_data[joined_data["_merge"] == "left_only"]
-        missing_rows["pick_count"] = 1
-        if len(missing_rows) > 0:
-            new_choices = missing_rows[
-                ["tour_id", alt_dest_col_name, "prob", "pick_count", "person_id"]
-            ].set_index("tour_id")
-            choices = choices.append(new_choices, ignore_index=False).sort_index()
-            # making prob 0 for missing rows so it does not influence model decision
-            choices["prob"] = choices["prob"].fillna(0)
-            # sort by tour_id and alt_dest
-            choices = (
-                choices.reset_index()
-                .sort_values(by=["tour_id", alt_dest_col_name])
-                .set_index("tour_id")
-            )
-
     return choices
 
 
@@ -343,7 +310,12 @@ def choose_MAZ_for_TAZ(state: workflow.State, taz_sample, MAZ_size_terms, trace_
 
     # taz_choices index values should be contiguous
     assert (
-        taz_choices[chooser_id_col] == np.repeat(chooser_df.index, taz_sample_size)
+        (taz_choices[chooser_id_col] == np.repeat(chooser_df.index, taz_sample_size))
+        # can get one extra if sampling in estimation mode
+        | (
+            taz_choices[chooser_id_col]
+            == np.repeat(chooser_df.index, taz_sample_size + 1)
+        )
     ).all()
 
     # we need to choose a MAZ for each DEST_TAZ choice

@@ -79,7 +79,7 @@ class EstimationConfig(PydanticReadable):
     bundles: list[str] = []
     """List of component names to create EDBs for."""
 
-    model_estimation_table_types: dict[str, str] = {}
+    estimation_table_types: dict[str, str] = {}
     """Mapping of component names to estimation table types.
 
     The keys of this mapping are the model component names, and the values are the
@@ -100,15 +100,15 @@ class EstimationConfig(PydanticReadable):
 
     survey_tables: dict[str, SurveyTableConfig] = {}
 
-    # pydantic class validator to ensure that the model_estimation_table_types
+    # pydantic class validator to ensure that the estimation_table_types
     # dictionary is a valid dictionary with string keys and string values, and
     # that all the values are in the estimation_table_recipes dictionary
     @model_validator(mode="after")
-    def validate_model_estimation_table_types(self):
-        for key, value in self.model_estimation_table_types.items():
+    def validate_estimation_table_types(self):
+        for key, value in self.estimation_table_types.items():
             if value not in self.estimation_table_recipes:
                 raise ValueError(
-                    f"model_estimation_table_types value '{value}' not in estimation_table_recipes"
+                    f"estimation_table_types value '{value}' not in estimation_table_recipes"
                 )
         return self
 
@@ -650,7 +650,24 @@ class Estimator:
         output_format = self.settings.EDB_ALTS_FILE_FORMAT
         assert output_format in ["verbose", "compact"]
 
+        original_alt_ids = None
         if output_format == "compact":
+            # preserve the original alt_ids in the EDB output
+            original_alt_ids = melt_df[[chooser_name, alt_id_name]].drop_duplicates(
+                ignore_index=True
+            )
+            original_alt_ids = original_alt_ids.set_index(
+                [chooser_name, alt_id_name], drop=False
+            )[alt_id_name]
+            original_alt_ids.index = pd.MultiIndex.from_arrays(
+                [
+                    original_alt_ids.index.get_level_values(0),
+                    original_alt_ids.groupby(level=0).cumcount(),
+                ],
+                names=[chooser_name, alt_id_name],
+            )
+            original_alt_ids = original_alt_ids.unstack(1, fill_value=-1)
+
             # renumber the alt_id column to just count from 1 to n
             # this loses the alt_id information, but drops all of the empty columns
             # (can still get empty columns if not every chooser has same number of alts)
@@ -663,7 +680,13 @@ class Estimator:
             [chooser_name, variable_column, alt_id_name]
         ).unstack(2)
         melt_df.columns = melt_df.columns.droplevel(0)
-        melt_df = melt_df.reset_index(1)
+        if original_alt_ids is not None:
+            original_alt_ids.index = pd.MultiIndex.from_arrays(
+                [original_alt_ids.index, pd.Index(["alt_id"] * len(original_alt_ids))],
+                names=melt_df.index.names,
+            )
+            melt_df = pd.concat([melt_df, original_alt_ids], axis=0)
+        melt_df = melt_df.sort_index().reset_index(1)
 
         # person_id,expression,1,2,3,4,5,...
         # 31153,util_dist_0_1,0.75,0.46,0.27,0.63,0.48,...
@@ -745,9 +768,10 @@ class EstimationManager(object):
         self.settings_initialized = False
         self.bundles = []
         self.estimation_table_recipes: dict[str, EstimationTableRecipeConfig] = {}
-        self.model_estimation_table_types: dict[str, str] = {}
+        self.estimation_table_types: dict[str, str] = {}
         self.estimating = {}
         self.settings = None
+        self.enabled = False
 
     def initialize_settings(self, state):
         # FIXME - can't we just initialize in init and handle no-presence of settings file as not enabled
@@ -765,7 +789,7 @@ class EstimationManager(object):
             self.enabled = self.settings.enable
         self.bundles = self.settings.bundles
 
-        self.model_estimation_table_types = self.settings.model_estimation_table_types
+        self.estimation_table_types = self.settings.estimation_table_types
         self.estimation_table_recipes = self.settings.estimation_table_recipes
 
         if self.enabled:
@@ -843,13 +867,13 @@ class EstimationManager(object):
         ), "Cant begin estimating %s - already estimating that model." % (model_name,)
 
         assert (
-            bundle_name in self.model_estimation_table_types
+            bundle_name in self.estimation_table_types
         ), "No estimation_table_type for %s in %s." % (
             bundle_name,
             ESTIMATION_SETTINGS_FILE_NAME,
         )
 
-        model_estimation_table_type = self.model_estimation_table_types[bundle_name]
+        model_estimation_table_type = self.estimation_table_types[bundle_name]
 
         assert (
             model_estimation_table_type in self.estimation_table_recipes
@@ -990,6 +1014,68 @@ class EstimationManager(object):
                         values[c] = values[c].astype(model_values[c].dtype)
 
         return values[column_name] if column_name else values
+
+    def get_survey_destination_chocies(self, state, choosers, trace_label):
+        """
+        Returning the survey choices for the destination choice model.
+        This gets called from inside interaction_sample and is used to
+        ensure the choices include the override choices when sampling alternatives.
+
+        Parameters
+        ----------
+        state : workflow.State
+        trace_label : str
+            The model name.
+
+        Returns
+        -------
+        pd.Series : The survey choices for the destination choice model.
+        """
+        if "accessibilities" in trace_label:
+            # accessibilities models to not have survey values
+            return None
+
+        model = trace_label.split(".")[0]
+        if model == "school_location":
+            survey_choices = manager.get_survey_values(
+                choosers.index, "persons", "school_zone_id"
+            )
+        elif model == "workplace_location":
+            survey_choices = manager.get_survey_values(
+                choosers.index, "persons", "workplace_zone_id"
+            )
+        elif model in [
+            "joint_tour_destination",
+            "atwork_subtour_destination",
+            "non_mandatory_tour_destination",
+        ]:
+            survey_choices = manager.get_survey_values(
+                choosers.index, "tours", "destination"
+            )
+        elif model == "trip_destination":
+            survey_choices = manager.get_survey_values(
+                choosers.index, "trips", "destination"
+            )
+        elif model == "parking_location":
+            # need to grab parking location column name from its settings
+            from activitysim.abm.models.parking_location_choice import (
+                ParkingLocationSettings,
+            )
+
+            model_settings = ParkingLocationSettings.read_settings_file(
+                state.filesystem,
+                "parking_location_choice.yaml",
+            )
+            survey_choices = manager.get_survey_values(
+                choosers.index, "trips", model_settings.ALT_DEST_COL_NAME
+            )
+        else:
+            # since this fucntion is called from inside interaction_sample,
+            # we don't want to return anything for other models that aren't destination choice
+            # not implemented models include scheduling models and tour_od_choice
+            logger.debug(f"Not grabbing survey choices for {model}.")
+            return None
+        return survey_choices
 
 
 manager = EstimationManager()

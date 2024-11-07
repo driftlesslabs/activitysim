@@ -78,8 +78,12 @@ def location_choice_model(
     edb_directory = edb_directory.format(name=name)
 
     def _read_csv(filename, **kwargs):
-        filename = filename.format(name=name)
-        return pd.read_csv(os.path.join(edb_directory, filename), **kwargs)
+        filename = Path(edb_directory).joinpath(filename.format(name=name))
+        if filename.with_suffix(".parquet").exists():
+            print("loading from", filename.with_suffix(".parquet"))
+            return pd.read_parquet(filename.with_suffix(".parquet"), **kwargs)
+        print("loading from", filename)
+        return pd.read_csv(filename, **kwargs)
 
     def _read_feather(filename, **kwargs):
         filename = filename.format(name=name)
@@ -286,7 +290,12 @@ def location_choice_model(
 
     # Merge land use characteristics into CA data
     try:
-        x_ca_1 = pd.merge(x_ca, landuse, on="zone_id", how="left")
+        if "alt_id" in x_ca:
+            x_ca_1 = pd.merge(x_ca, landuse, left_on="alt_id", right_index=True)
+            choice_def = {"choice_ca_var": "override_choice == alt_id"}
+        else:
+            x_ca_1 = pd.merge(x_ca, landuse, on="zone_id", how="left")
+            choice_def = {"choice_co_code": "override_choice"}
     except KeyError:
         # Missing the zone_id variable?
         # Use the alternative id's instead, which assumes no sampling of alternatives
@@ -297,7 +306,9 @@ def location_choice_model(
             right_index=True,
             how="left",
         )
-    x_ca_1.index = x_ca.index
+        choice_def = {"choice_co_code": "override_choice"}
+
+    x_ca_1 = x_ca_1.sort_index()
 
     # Availability of choice zones
     if "util_no_attractions" in x_ca_1:
@@ -327,6 +338,15 @@ def location_choice_model(
         d["_avail_"] = av
 
     m = Model(datatree=d, compute_engine="numba")
+
+    # One of the alternatives might be coded as 0, so
+    # we need to explicitly initialize the MNL nesting graph
+    # and set to root_id to a value other than zero.
+    root_id = 0
+    if root_id in d.dc.altids():
+        root_id = -1
+    m.initialize_graph(alternative_codes=d.dc.altids(), root_id=root_id)
+
     if len(spec.columns) == 4 and all(
         spec.columns == ["Label", "Description", "Expression", "coefficient"]
     ):
@@ -378,7 +398,7 @@ def location_choice_model(
     apply_coefficients(coefficients, m, minimum=-25, maximum=25)
     apply_coefficients(size_coef, m, minimum=-6, maximum=6)
 
-    m.choice_co_code = "override_choice"
+    m.choice_def(choice_def)
     if av is not None:
         m.availability_ca_var = "_avail_"
     else:

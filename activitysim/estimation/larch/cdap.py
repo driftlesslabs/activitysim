@@ -399,8 +399,12 @@ def cdap_data(
         raise FileNotFoundError(edb_directory)
 
     def read_csv(filename, **kwargs):
-        filename = filename.format(name=name)
-        return pd.read_csv(os.path.join(edb_directory, filename), **kwargs)
+        filename = Path(edb_directory).joinpath(filename.format(name=name))
+        if filename.with_suffix(".parquet").exists():
+            if "comment" in kwargs:
+                del kwargs["comment"]
+            return pd.read_parquet(filename.with_suffix(".parquet"), **kwargs)
+        return pd.read_csv(filename, **kwargs)
 
     def read_yaml(filename, **kwargs):
         filename = filename.format(name=name)
