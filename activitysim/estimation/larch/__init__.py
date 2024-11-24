@@ -3,7 +3,6 @@ from __future__ import annotations
 import larch as lx
 from packaging.version import Version
 
-from .auto_ownership import auto_ownership_model
 from .cdap import *
 from .data_maker import *
 from .general import *

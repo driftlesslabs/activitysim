@@ -112,7 +112,9 @@ def str_repr(x):
     return x
 
 
-def linear_utility_from_spec(spec, x_col, p_col, ignore_x=(), segment_id=None):
+def linear_utility_from_spec(
+    spec, x_col, p_col, ignore_x=(), segment_id=None, x_validator=None, expr_col=None
+):
     """
     Create a linear function from a spec DataFrame.
 
@@ -137,6 +139,13 @@ def linear_utility_from_spec(spec, x_col, p_col, ignore_x=(), segment_id=None):
         The CHOOSER_SEGMENT_COLUMN_NAME identified for ActivitySim.
         This value is ignored if `p_col` is a string, and required
         if `p_col` is a dict.
+    x_validator : Container, optional
+        A container of valid values for the x_col.  If given, the
+        x_col values will be used if they are `in` the x_validator,
+        otherwise the value from `expr_col` will be used.
+    expr_col : str, optional
+        The name of the column to use when the x_col value is not
+        in the x_validator.
 
     Returns
     -------
@@ -152,6 +161,8 @@ def linear_utility_from_spec(spec, x_col, p_col, ignore_x=(), segment_id=None):
                 x_col,
                 seg_p_col,
                 ignore_x,
+                x_validator,
+                expr_col,
             ) * X(f"{segment_id}=={str_repr(segval)}")
         return sum(partial_utility.values())
     parts = []
@@ -164,6 +175,16 @@ def linear_utility_from_spec(spec, x_col, p_col, ignore_x=(), segment_id=None):
                 _x = None
             else:
                 raise
+
+        # when a validator is given, use the expression column if the original
+        # x value is not in the validator
+        if _x is not None and _x not in ignore_x:
+            if x_validator is not None and _x not in x_validator:
+                _x = spec.loc[i, expr_col]
+                if _x.startswith("@"):
+                    _x = _x[1:]
+
+        # handle the parameter...
         _p = spec.loc[i, p_col]
 
         if _x is not None and (_x not in ignore_x) and not pd.isna(_p):
@@ -202,7 +223,9 @@ def linear_utility_from_spec(spec, x_col, p_col, ignore_x=(), segment_id=None):
     return sum(parts)
 
 
-def dict_of_linear_utility_from_spec(spec, x_col, p_col, ignore_x=()):
+def dict_of_linear_utility_from_spec(
+    spec, x_col, p_col, ignore_x=(), x_validator=None, expr_col=None
+):
     """
     Create a linear function from a spec DataFrame.
 
@@ -224,6 +247,13 @@ def dict_of_linear_utility_from_spec(spec, x_col, p_col, ignore_x=()):
         The CHOOSER_SEGMENT_COLUMN_NAME identified for ActivitySim.
         This value is ignored if `p_col` is a string, and required
         if `p_col` is a dict.
+    x_validator : Container, optional
+        A container of valid values for the x_col.  If given, the
+        x_col values will be used if they are `in` the x_validator,
+        otherwise the value from `expr_col` will be used.
+    expr_col : str, optional
+        The name of the column to use when the x_col value is not
+        in the x_validator.
 
     Returns
     -------
@@ -232,7 +262,12 @@ def dict_of_linear_utility_from_spec(spec, x_col, p_col, ignore_x=()):
     utils = {}
     for altname, altcode in p_col.items():
         utils[altcode] = linear_utility_from_spec(
-            spec, x_col, altname, ignore_x=ignore_x
+            spec,
+            x_col,
+            altname,
+            ignore_x=ignore_x,
+            x_validator=x_validator,
+            expr_col=expr_col,
         )
     return utils
 

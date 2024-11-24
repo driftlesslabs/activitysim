@@ -70,6 +70,19 @@ SimpleSimulateData = collections.namedtuple(
 )
 
 
+def read_spec(filename: str | os.PathLike) -> pd.DataFrame:
+    """Read a simple simulate spec file"""
+    spec = pd.read_csv(filename, comment="#")
+    spec = remove_apostrophes(spec, ["Label"])
+
+    # remove temp rows from spec, ASim uses them to calculate the other values written
+    # to the EDB, but they are not actually part of the utility function themselves.
+    spec = spec.loc[~spec.Expression.isna()]
+    spec = spec.loc[~spec.Expression.str.startswith("_")].copy()
+
+    return spec
+
+
 def simple_simulate_data(
     name="tour_mode_choice",
     edb_directory="output/estimation_data_bundle/{name}/",
@@ -111,13 +124,7 @@ def simple_simulate_data(
         except FileNotFoundError:
             coef_template = None
 
-        spec = _read_csv(spec_file, comment="#")
-        spec = remove_apostrophes(spec, ["Label"])
-
-        # remove temp rows from spec, ASim uses them to calculate the other values written
-        # to the EDB, but they are not actually part of the utility function themselves.
-        spec = spec.loc[~spec.Expression.isna()]
-        spec = spec.loc[~spec.Expression.str.startswith("_")].copy()
+        spec = read_spec(Path(edb_directory).joinpath(spec_file.format(name=name)))
 
         alt_names = list(spec.columns[3:])
         alt_codes = np.arange(1, len(alt_names) + 1)
@@ -189,6 +196,8 @@ def simple_simulate_model(
         spec,
         "Label",
         dict(zip(alt_names, alt_codes, strict=False)),
+        x_validator=chooser_data,
+        expr_col="Expression",
     )
 
     apply_coefficients(coefficients, m)
@@ -205,7 +214,7 @@ def simple_simulate_model(
             chooser_data, alts=dict(zip(alt_codes, alt_names, strict=False))
         )
 
-    m.datatree = d
+    m.datatree = d.dc.as_tree("df")
     m.graph = tree
     m.choice_co_code = "override_choice_code"
 
