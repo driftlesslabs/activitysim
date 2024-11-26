@@ -94,7 +94,7 @@ class EstimationConfig(PydanticReadable):
     bundles: list[str] = []
     """List of component names to create EDBs for."""
 
-    model_estimation_table_types: dict[str, str] = {}
+    estimation_table_types: dict[str, str] = {}
     """Mapping of component names to estimation table types.
 
     The keys of this mapping are the model component names, and the values are the
@@ -115,15 +115,15 @@ class EstimationConfig(PydanticReadable):
 
     survey_tables: dict[str, SurveyTableConfig] = {}
 
-    # pydantic class validator to ensure that the model_estimation_table_types
+    # pydantic class validator to ensure that the estimation_table_types
     # dictionary is a valid dictionary with string keys and string values, and
     # that all the values are in the estimation_table_recipes dictionary
     @model_validator(mode="after")
-    def validate_model_estimation_table_types(self):
-        for key, value in self.model_estimation_table_types.items():
+    def validate_estimation_table_types(self):
+        for key, value in self.estimation_table_types.items():
             if value not in self.estimation_table_recipes:
                 raise ValueError(
-                    f"model_estimation_table_types value '{value}' not in estimation_table_recipes"
+                    f"estimation_table_types value '{value}' not in estimation_table_recipes"
                 )
         return self
 
@@ -806,7 +806,7 @@ class EstimationManager(object):
         self.settings_initialized = False
         self.bundles = []
         self.estimation_table_recipes: dict[str, EstimationTableRecipeConfig] = {}
-        self.model_estimation_table_types: dict[str, str] = {}
+        self.estimation_table_types: dict[str, str] = {}
         self.estimating = {}
         self.settings = None
         self.enabled = False
@@ -827,7 +827,7 @@ class EstimationManager(object):
             self.enabled = self.settings.enable
         self.bundles = self.settings.bundles
 
-        self.model_estimation_table_types = self.settings.model_estimation_table_types
+        self.estimation_table_types = self.settings.estimation_table_types
         self.estimation_table_recipes = self.settings.estimation_table_recipes
 
         if self.enabled:
