@@ -70,8 +70,23 @@ class EstimationTableRecipeConfig(PydanticBase):
 
 class EstimationConfig(PydanticReadable):
     SKIP_BUNDLE_WRITE_FOR: list[str] = []
+    """List of bundle names to skip writing to disk.
+
+    This is useful for saving disk space and decreasing runtime
+    if you do not care about the estimation output for all models.
+    """
     EDB_FILETYPE: Literal["csv", "parquet", "pkl"] = "csv"
     EDB_ALTS_FILE_FORMAT: Literal["verbose", "compact"] = "verbose"
+    """Format of the alternatives table in the estimation data bundle.
+
+    verbose: every possible alternative is listed in the table
+    compact: alternatives are renumbered from 1 to sample_size
+    """
+    DELETE_MP_SUBDIRS: bool = True
+    """Flag to delete the multiprocessing subdirectories after coalescing the results.
+
+    Typically only used for debugging purposes.
+    """
 
     enable: bool = False
     """Flag to enable estimation."""
@@ -79,7 +94,7 @@ class EstimationConfig(PydanticReadable):
     bundles: list[str] = []
     """List of component names to create EDBs for."""
 
-    estimation_table_types: dict[str, str] = {}
+    model_estimation_table_types: dict[str, str] = {}
     """Mapping of component names to estimation table types.
 
     The keys of this mapping are the model component names, and the values are the
@@ -100,15 +115,15 @@ class EstimationConfig(PydanticReadable):
 
     survey_tables: dict[str, SurveyTableConfig] = {}
 
-    # pydantic class validator to ensure that the estimation_table_types
+    # pydantic class validator to ensure that the model_estimation_table_types
     # dictionary is a valid dictionary with string keys and string values, and
     # that all the values are in the estimation_table_recipes dictionary
     @model_validator(mode="after")
-    def validate_estimation_table_types(self):
-        for key, value in self.estimation_table_types.items():
+    def validate_model_estimation_table_types(self):
+        for key, value in self.model_estimation_table_types.items():
             if value not in self.estimation_table_recipes:
                 raise ValueError(
-                    f"estimation_table_types value '{value}' not in estimation_table_recipes"
+                    f"model_estimation_table_types value '{value}' not in estimation_table_recipes"
                 )
         return self
 
@@ -262,26 +277,26 @@ class Estimator:
         ), f"file already exists: {file_path}"
 
         # Explicitly set the data types of the columns
-        for col in df.columns:
-            if "int" in str(df[col].dtype):
+        for col_name, col_data in df.iteritems():
+            if "int" in str(col_data.dtype):
                 pass
             elif (
-                df[col].dtype == "float16"
+                col_data.dtype == "float16"
             ):  # Handle halffloat type not allowed in parquet
-                df[col] = df[col].astype("float32")
-            elif "float" in str(df[col].dtype):
+                df[col_name] = col_data.astype("float32")
+            elif "float" in str(col_data.dtype):
                 pass
-            elif df[col].dtype == "bool":
+            elif col_data.dtype == "bool":
                 pass
-            elif df[col].dtype == "object":
+            elif col_data.dtype == "object":
                 # first try converting to numeric, if that fails, convert to string
                 try:
-                    df[col] = pd.to_numeric(df[col], errors="raise")
+                    df[col_name] = pd.to_numeric(col_data, errors="raise")
                 except ValueError:
-                    df[col] = df[col].astype(str)
+                    df[col_name] = col_data.astype(str)
             else:
                 # Convert any other unsupported types to string
-                df[col] = df[col].astype(str)
+                df[col_name] = col_data.astype(str)
 
         self.debug(f"writing table: {file_path}")
         # want parquet file to be exactly the same as df read from csv
@@ -437,6 +452,26 @@ class Estimator:
                 df = pd.DataFrame()
             else:
                 df = pd.concat([self.tables[t] for t in table_names], axis=concat_axis)
+
+            # remove duplicated columns, keeping the first instance
+            df = df.loc[:, ~df.columns.duplicated()]
+
+            # set index if not already set according to lowest level heirarchy
+            # df missing index is typically coming from interaction_simulate expression values
+            # important for sorting and thus for multiprocessing to be consistent with single
+            if df.index.name is None:
+                if "trip_id" in df.columns:
+                    df.set_index("trip_id", inplace=True)
+                elif "tour_id" in df.columns:
+                    df.set_index("tour_id", inplace=True)
+                elif "person_id" in df.columns:
+                    df.set_index("person_id", inplace=True)
+                elif "household_id" in df.columns:
+                    df.set_index("household_id", inplace=True)
+                else:
+                    RuntimeError(
+                        f"No index column found in omnibus table {omnibus_table}: {df}"
+                    )
 
             self.debug(f"sorting tables: {table_names}")
             df.sort_index(ascending=True, inplace=True, kind="mergesort")
@@ -650,42 +685,42 @@ class Estimator:
         output_format = self.settings.EDB_ALTS_FILE_FORMAT
         assert output_format in ["verbose", "compact"]
 
-        original_alt_ids = None
-        if output_format == "compact":
-            # preserve the original alt_ids in the EDB output
-            original_alt_ids = melt_df[[chooser_name, alt_id_name]].drop_duplicates(
-                ignore_index=True
-            )
-            original_alt_ids = original_alt_ids.set_index(
-                [chooser_name, alt_id_name], drop=False
-            )[alt_id_name]
-            original_alt_ids.index = pd.MultiIndex.from_arrays(
-                [
-                    original_alt_ids.index.get_level_values(0),
-                    original_alt_ids.groupby(level=0).cumcount(),
-                ],
-                names=[chooser_name, alt_id_name],
-            )
-            original_alt_ids = original_alt_ids.unstack(1, fill_value=-1)
-
-            # renumber the alt_id column to just count from 1 to n
-            # this loses the alt_id information, but drops all of the empty columns
-            # (can still get empty columns if not every chooser has same number of alts)
-            # (this can happen if the pick count > 1 and/or sampled alts are not included)
-            melt_df[alt_id_name] = melt_df.groupby([chooser_name, variable_column])[
-                alt_id_name
-            ].cumcount()
+        # original_alt_ids = None
+        # if output_format == "compact":
+        #     # preserve the original alt_ids in the EDB output
+        #     original_alt_ids = melt_df[[chooser_name, alt_id_name]].drop_duplicates(
+        #         ignore_index=True
+        #     )
+        #     original_alt_ids = original_alt_ids.set_index(
+        #         [chooser_name, alt_id_name], drop=False
+        #     )[alt_id_name]
+        #     original_alt_ids.index = pd.MultiIndex.from_arrays(
+        #         [
+        #             original_alt_ids.index.get_level_values(0),
+        #             original_alt_ids.groupby(level=0).cumcount(),
+        #         ],
+        #         names=[chooser_name, alt_id_name],
+        #     )
+        #     original_alt_ids = original_alt_ids.unstack(1, fill_value=-1)
+        #
+        #     # renumber the alt_id column to just count from 1 to n
+        #     # this loses the alt_id information, but drops all of the empty columns
+        #     # (can still get empty columns if not every chooser has same number of alts)
+        #     # (this can happen if the pick count > 1 and/or sampled alts are not included)
+        #     melt_df[alt_id_name] = melt_df.groupby([chooser_name, variable_column])[
+        #         alt_id_name
+        #     ].cumcount()
 
         melt_df = melt_df.set_index(
             [chooser_name, variable_column, alt_id_name]
         ).unstack(2)
         melt_df.columns = melt_df.columns.droplevel(0)
-        if original_alt_ids is not None:
-            original_alt_ids.index = pd.MultiIndex.from_arrays(
-                [original_alt_ids.index, pd.Index(["alt_id"] * len(original_alt_ids))],
-                names=melt_df.index.names,
-            )
-            melt_df = pd.concat([melt_df, original_alt_ids], axis=0)
+        # if original_alt_ids is not None:
+        #     original_alt_ids.index = pd.MultiIndex.from_arrays(
+        #         [original_alt_ids.index, pd.Index(["alt_id"] * len(original_alt_ids))],
+        #         names=melt_df.index.names,
+        #     )
+        #     melt_df = pd.concat([melt_df, original_alt_ids], axis=0)
         melt_df = melt_df.sort_index().reset_index(1)
 
         # person_id,expression,1,2,3,4,5,...
@@ -696,7 +731,8 @@ class Estimator:
         return melt_df
 
     def write_interaction_expression_values(self, df):
-        df = self.melt_alternatives(df)
+        if self.settings.EDB_ALTS_FILE_FORMAT == "verbose":
+            df = self.melt_alternatives(df)
         self.write_table(
             df,
             "interaction_expression_values",
@@ -721,7 +757,8 @@ class Estimator:
         )
 
     def write_interaction_sample_alternatives(self, alternatives_df):
-        alternatives_df = self.melt_alternatives(alternatives_df)
+        if self.settings.EDB_ALTS_FILE_FORMAT == "verbose":
+            alternatives_df = self.melt_alternatives(alternatives_df)
         self.write_table(
             alternatives_df,
             "interaction_sample_alternatives",
@@ -730,7 +767,8 @@ class Estimator:
         )
 
     def write_interaction_simulate_alternatives(self, interaction_df):
-        interaction_df = self.melt_alternatives(interaction_df)
+        if self.settings.EDB_ALTS_FILE_FORMAT == "verbose":
+            interaction_df = self.melt_alternatives(interaction_df)
         self.write_table(
             interaction_df,
             "interaction_simulate_alternatives",
@@ -768,7 +806,7 @@ class EstimationManager(object):
         self.settings_initialized = False
         self.bundles = []
         self.estimation_table_recipes: dict[str, EstimationTableRecipeConfig] = {}
-        self.estimation_table_types: dict[str, str] = {}
+        self.model_estimation_table_types: dict[str, str] = {}
         self.estimating = {}
         self.settings = None
         self.enabled = False
@@ -789,7 +827,7 @@ class EstimationManager(object):
             self.enabled = self.settings.enable
         self.bundles = self.settings.bundles
 
-        self.estimation_table_types = self.settings.estimation_table_types
+        self.model_estimation_table_types = self.settings.model_estimation_table_types
         self.estimation_table_recipes = self.settings.estimation_table_recipes
 
         if self.enabled:
@@ -1015,7 +1053,7 @@ class EstimationManager(object):
 
         return values[column_name] if column_name else values
 
-    def get_survey_destination_chocies(self, state, choosers, trace_label):
+    def get_survey_destination_choices(self, state, choosers, trace_label):
         """
         Returning the survey choices for the destination choice model.
         This gets called from inside interaction_sample and is used to
@@ -1075,6 +1113,20 @@ class EstimationManager(object):
             # not implemented models include scheduling models and tour_od_choice
             logger.debug(f"Not grabbing survey choices for {model}.")
             return None
+
+        if "presample.interaction_sample" in trace_label:
+            # presampling happens for destination choice of two-zone systems.
+            # They are pre-sampling TAZs but the survey value destination is MAZs.
+            land_use = state.get_table("land_use")
+            TAZ_col = "TAZ" if "TAZ" in land_use.columns else "taz"
+            assert (
+                TAZ_col in land_use.columns
+            ), "Cannot find TAZ column in land_use table."
+            maz_to_taz_map = land_use[TAZ_col].to_dict()
+            # allow for unmapped TAZs
+            maz_to_taz_map[-1] = -1
+            survey_choices = survey_choices.map(maz_to_taz_map)
+
         return survey_choices
 
 

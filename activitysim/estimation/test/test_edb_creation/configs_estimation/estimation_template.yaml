@@ -1,5 +1,6 @@
 EDB_ALTS_FILE_FORMAT: compact   # options: compact, verbose
 EDB_FILETYPE: csv            # options: csv, parquet, pkl
+DELETE_MP_SUBDIRS: True
 
 enable: True
 
@@ -62,7 +63,7 @@ estimation_table_recipes:
       alternatives_combined:
         - interaction_sample_alternatives
         - interaction_expression_values
-    omnibus_tables_append_columns: [choosers_combined]
+    omnibus_tables_append_columns: [choosers_combined, alternatives_combined]
 
   interaction_simulate:
     omnibus_tables:
@@ -70,7 +71,9 @@ estimation_table_recipes:
         - choices
         - override_choices
         - choosers
-    omnibus_tables_append_columns: [choosers_combined]
+      alternatives_combined:
+        - interaction_expression_values
+    omnibus_tables_append_columns: [choosers_combined, alternatives_combined]
 
   simple_simulate:
     omnibus_tables:
