@@ -218,6 +218,10 @@ def simple_simulate_model(
     m.graph = tree
     m.choice_co_code = "override_choice_code"
 
+    # set bounds on unbounded coefficients, so that they don't get big
+    # and cause numerical errors which some optimizers can't handle
+    m.set_cap(50)
+
     if return_data:
         return (
             m,
