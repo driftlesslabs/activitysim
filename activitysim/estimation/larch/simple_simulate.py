@@ -72,6 +72,7 @@ SimpleSimulateData = collections.namedtuple(
 
 def read_spec(filename: str | os.PathLike) -> pd.DataFrame:
     """Read a simple simulate spec file"""
+    print("loading spec from", filename)
     spec = pd.read_csv(filename, comment="#")
     spec = remove_apostrophes(spec, ["Label"])
 
@@ -100,7 +101,8 @@ def simple_simulate_data(
         if filename.with_suffix(".parquet").exists():
             print("loading from", filename.with_suffix(".parquet"))
             return pd.read_parquet(filename.with_suffix(".parquet"), **kwargs)
-        print("loading from", filename)
+        if filename.exists():
+            print("loading from", filename)
         return pd.read_csv(filename, **kwargs)
 
     settings_file = settings_file.format(name=name)
