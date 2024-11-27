@@ -30,6 +30,8 @@ def schedule_choice_model(
     chooser_file="{name}_choosers_combined.csv",
     settings_file="{name}_model_settings.yaml",
     return_data=False,
+    *,
+    alts_in_cv_format=False,
 ):
     model_selector = name.replace("_location", "")
     model_selector = model_selector.replace("_destination", "")
@@ -137,10 +139,14 @@ def schedule_choice_model(
     chooser_index_name = chooser_data.columns[0]
     x_co = chooser_data.set_index(chooser_index_name)
     alt_values.fillna(0, inplace=True)
-    x_ca = cv_to_ca(
-        alt_values.set_index([chooser_index_name, alt_values.columns[1]]),
-        required_labels=spec[label_column_name],
-    )
+    if alts_in_cv_format:
+        x_ca = cv_to_ca(
+            alt_values.set_index([chooser_index_name, alt_values.columns[1]]),
+            required_labels=spec[label_column_name],
+        )
+    else:
+        # the alternative code is "tdd"
+        x_ca = alt_values.set_index([chooser_index_name, "tdd"])
 
     # if CHOOSER_SEGMENT_COLUMN_NAME is not None:
     #     # label segments with names
@@ -158,7 +164,10 @@ def schedule_choice_model(
 
     unavail_coefs = coefficients.query("(constrain == 'T') & (value < -900)").index
     unavail_data = [i.data for i in m.utility_ca if i.param in unavail_coefs]
-    if len(unavail_data):
+
+    if "mode_choice_logsum" in x_ca and not len(unavail_data):
+        joint_avail = "~(mode_choice_logsum_missing)"
+    elif len(unavail_data):
         joint_unavail = "|".join(f"({i}>0)" for i in unavail_data)
         joint_avail = f"~({joint_unavail})"
     else:
@@ -166,6 +175,10 @@ def schedule_choice_model(
 
     # d = DataFrames(co=x_co, ca=x_ca, av=joint_avail)  # larch 5.7
     d_ca = Dataset.construct.from_idca(x_ca)
+    if joint_avail == "~(mode_choice_logsum_missing)":
+        tmp = np.isnan(d_ca["mode_choice_logsum"])
+        tmp = tmp.drop_vars(tmp.coords)
+        d_ca = d_ca.assign(mode_choice_logsum_missing=tmp)
     d_co = Dataset.construct.from_idco(x_co)
     d = d_ca.merge(d_co)
     # if joint_avail is not None:
