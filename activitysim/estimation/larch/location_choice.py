@@ -3,6 +3,7 @@ from __future__ import annotations
 import collections
 import os
 import pickle
+import warnings
 from datetime import datetime
 from pathlib import Path
 from typing import Collection
@@ -218,6 +219,11 @@ def location_choice_model(
         return (a[i * k + min(i, m) : (i + 1) * k + min(i + 1, m)] for i in range(n))
 
     if alts_in_cv_format:
+        # if alternatives are in CV format, convert them to CA format.
+        # The CV format has the chooser index as the first column and the variable name
+        # as the second column, with values for each alternative in the remaining columns.
+        # This format is inefficient and deprecated as of ActivitySim version 1.4.
+
         # process x_ca with cv_to_ca with or without chunking
         x_ca_pickle_file = "{name}_x_ca.pkl"
         if chunking_size == None:
@@ -260,7 +266,8 @@ def location_choice_model(
             )
     else:
         # otherwise, we assume that the alternatives are already in the correct IDCA format with
-        # the cases and alternatives as the first two columns
+        # the cases and alternatives as the first two columns, and the variables as the
+        # remaining columns.  This is a much more efficient format for the data.
         assert alt_values.columns[0] == chooser_index_name
         x_ca = alt_values.set_index([chooser_index_name, alt_values.columns[1]])
 
@@ -294,30 +301,39 @@ def location_choice_model(
 
     # Remove choosers with invalid observed choice (appropriate total size value = 0)
     valid_observed_zone = x_co["total_size_segment"] > 0
+    prior_n_cases = len(x_co)
     x_co = x_co[valid_observed_zone]
     x_ca = x_ca[x_ca.index.get_level_values(chooser_index_name).isin(x_co.index)]
+    after_n_cases = len(x_co)
+    if prior_n_cases != after_n_cases:
+        warnings.warn(
+            f"Removed {prior_n_cases - after_n_cases} choosers with invalid (zero-sized) observed choice",
+            stacklevel=2,
+        )
 
     # Merge land use characteristics into CA data
-    try:
-        if "alt_id" in x_ca:
-            x_ca_1 = pd.merge(x_ca, landuse, left_on="alt_id", right_index=True)
-            choice_def = {"choice_ca_var": "override_choice == alt_id"}
-        else:
-            x_ca_1 = pd.merge(x_ca, landuse, on="zone_id", how="left")
-            choice_def = {"choice_co_code": "override_choice"}
-    except KeyError:
-        # Missing the zone_id variable?
-        # Use the alternative id's instead, which assumes no sampling of alternatives
-        x_ca_1 = pd.merge(
-            x_ca,
-            landuse,
-            left_on=x_ca.index.get_level_values(1),
-            right_index=True,
-            how="left",
-        )
-        choice_def = {"choice_co_code": "override_choice"}
-
+    x_ca_1 = pd.merge(
+        x_ca, landuse, left_on=x_ca.index.get_level_values(1), right_index=True
+    )
     x_ca_1 = x_ca_1.sort_index()
+
+    # relabel zones to reduce memory usage.
+    # We will core the original zone ids in a new column _original_zone_id,
+    # and create a new index with a dummy zone id.  This way, if we have sampled
+    # only a subset of 30 zones, then we only need 30 unique alternatives in the
+    # data structure.
+    original_zone_ids = x_ca_1.index.get_level_values(1)
+
+    dummy_zone_ids_index = pd.MultiIndex.from_arrays(
+        [
+            x_ca_1.index.get_level_values(0),
+            x_ca_1.groupby(level=0).cumcount() + 1,
+        ],
+        names=[x_ca_1.index.names[0], "dummy_zone_id"],
+    )
+    x_ca_1.index = dummy_zone_ids_index
+    x_ca_1["_original_zone_id"] = original_zone_ids
+    choice_def = {"choice_ca_var": "override_choice == _original_zone_id"}
 
     # Availability of choice zones
     if "util_no_attractions" in x_ca_1:
