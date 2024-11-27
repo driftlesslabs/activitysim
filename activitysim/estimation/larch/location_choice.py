@@ -68,6 +68,7 @@ def location_choice_model(
     return_data=False,
     alt_values_to_feather=False,
     chunking_size=None,
+    alts_in_cv_format=False,
 ) -> Model | tuple[Model, LocationChoiceData]:
     model_selector = name.replace("_location", "")
     model_selector = model_selector.replace("_destination", "")
@@ -216,44 +217,52 @@ def location_choice_model(
         k, m = divmod(len(a), n)
         return (a[i * k + min(i, m) : (i + 1) * k + min(i + 1, m)] for i in range(n))
 
-    # process x_ca with cv_to_ca with or without chunking
-    x_ca_pickle_file = "{name}_x_ca.pkl"
-    if chunking_size == None:
-        x_ca = cv_to_ca(
-            alt_values.set_index([chooser_index_name, alt_values.columns[1]])
-        )
-    elif _file_exists(x_ca_pickle_file):
-        # if pickle file from previous x_ca processing exist, load it to save time
-        time_start = datetime.now()
-        x_ca = _read_pickle(x_ca_pickle_file)
-        print(
-            f"x_ca data loaded from {name}_x_ca.fea - time elapsed {(datetime.now() - time_start).total_seconds()}"
-        )
-    else:
-        time_start = datetime.now()
-        # calculate num_chunks based on chunking_size (or max number of rows per chunk)
-        num_chunks = int(len(alt_values) / chunking_size)
-        id_col_name = alt_values.columns[0]
-        all_ids = list(alt_values[id_col_name].unique())
-        split_ids = list(split(all_ids, num_chunks))
-        x_ca_list = []
-        i = 0
-        for chunk_ids in split_ids:
-            alt_values_i = alt_values[alt_values[id_col_name].isin(chunk_ids)]
-            x_ca_i = cv_to_ca(
-                alt_values_i.set_index([chooser_index_name, alt_values_i.columns[1]])
+    if alts_in_cv_format:
+        # process x_ca with cv_to_ca with or without chunking
+        x_ca_pickle_file = "{name}_x_ca.pkl"
+        if chunking_size == None:
+            x_ca = cv_to_ca(
+                alt_values.set_index([chooser_index_name, alt_values.columns[1]])
             )
-            x_ca_list.append(x_ca_i)
+        elif _file_exists(x_ca_pickle_file):
+            # if pickle file from previous x_ca processing exist, load it to save time
+            time_start = datetime.now()
+            x_ca = _read_pickle(x_ca_pickle_file)
             print(
-                f"\rx_ca_i compute done for chunk {i}/{num_chunks} - time elapsed {(datetime.now() - time_start).total_seconds()}"
+                f"x_ca data loaded from {name}_x_ca.fea - time elapsed {(datetime.now() - time_start).total_seconds()}"
             )
-            i = i + 1
-        x_ca = pd.concat(x_ca_list, axis=0)
-        # save final x_ca result as pickle file to save time for future data loading
-        _to_pickle(df=x_ca, filename=x_ca_pickle_file)
-        print(
-            f"x_ca compute done - time elapsed {(datetime.now() - time_start).total_seconds()}"
-        )
+        else:
+            time_start = datetime.now()
+            # calculate num_chunks based on chunking_size (or max number of rows per chunk)
+            num_chunks = int(len(alt_values) / chunking_size)
+            id_col_name = alt_values.columns[0]
+            all_ids = list(alt_values[id_col_name].unique())
+            split_ids = list(split(all_ids, num_chunks))
+            x_ca_list = []
+            i = 0
+            for chunk_ids in split_ids:
+                alt_values_i = alt_values[alt_values[id_col_name].isin(chunk_ids)]
+                x_ca_i = cv_to_ca(
+                    alt_values_i.set_index(
+                        [chooser_index_name, alt_values_i.columns[1]]
+                    )
+                )
+                x_ca_list.append(x_ca_i)
+                print(
+                    f"\rx_ca_i compute done for chunk {i}/{num_chunks} - time elapsed {(datetime.now() - time_start).total_seconds()}"
+                )
+                i = i + 1
+            x_ca = pd.concat(x_ca_list, axis=0)
+            # save final x_ca result as pickle file to save time for future data loading
+            _to_pickle(df=x_ca, filename=x_ca_pickle_file)
+            print(
+                f"x_ca compute done - time elapsed {(datetime.now() - time_start).total_seconds()}"
+            )
+    else:
+        # otherwise, we assume that the alternatives are already in the correct IDCA format with
+        # the cases and alternatives as the first two columns
+        assert alt_values.columns[0] == chooser_index_name
+        x_ca = alt_values.set_index([chooser_index_name, alt_values.columns[1]])
 
     if CHOOSER_SEGMENT_COLUMN_NAME is not None:
         # label segments with names
