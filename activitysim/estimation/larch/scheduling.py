@@ -137,7 +137,7 @@ def schedule_choice_model(
     apply_coefficients(coefficients, m, minimum=-25, maximum=25)
 
     chooser_index_name = chooser_data.columns[0]
-    x_co = chooser_data.set_index(chooser_index_name)
+    x_co = chooser_data.set_index(chooser_index_name).dropna(axis=1, how="all")
     alt_values.fillna(0, inplace=True)
     if alts_in_cv_format:
         x_ca = cv_to_ca(

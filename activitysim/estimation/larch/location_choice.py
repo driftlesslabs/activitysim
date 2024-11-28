@@ -69,6 +69,7 @@ def location_choice_model(
     return_data=False,
     alt_values_to_feather=False,
     chunking_size=None,
+    *,
     alts_in_cv_format=False,
 ) -> Model | tuple[Model, LocationChoiceData]:
     model_selector = name.replace("_location", "")
@@ -203,7 +204,11 @@ def location_choice_model(
 
     if label_column_name == "Expression":
         spec.insert(0, "Label", spec["Expression"].map(expression_labels))
-        alt_values["variable"] = alt_values["variable"].map(expression_labels)
+        if alts_in_cv_format:
+            alt_values["variable"] = alt_values["variable"].map(expression_labels)
+        else:
+            alt_values = alt_values.rename(columns=expression_labels)
+            print("MAPOING", expression_labels)
         label_column_name = "Label"
 
     if name == "trip_destination":
@@ -346,6 +351,13 @@ def location_choice_model(
     elif "@df['size_term']==0" in x_ca_1:
         av = (
             x_ca_1["@df['size_term']==0"]
+            .apply(lambda x: False if x == 1 else True)
+            .astype(np.int8)
+            .to_xarray()
+        )
+    elif expression_labels is not None and "@df['size_term']==0" in expression_labels:
+        av = (
+            x_ca_1[expression_labels["@df['size_term']==0"]]
             .apply(lambda x: False if x == 1 else True)
             .astype(np.int8)
             .to_xarray()

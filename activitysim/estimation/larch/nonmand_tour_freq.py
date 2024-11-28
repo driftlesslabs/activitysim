@@ -38,6 +38,8 @@ def interaction_simulate_data(
         filename = Path(edb_directory).joinpath(filename.format(name=name))
         if filename.with_suffix(".parquet").exists():
             print("loading from", filename.with_suffix(".parquet"))
+            if "comment" in kwargs:
+                kwargs.pop("comment")
             return pd.read_parquet(filename.with_suffix(".parquet"), **kwargs)
         print("loading from", filename)
         return pd.read_csv(filename, **kwargs)
@@ -209,6 +211,8 @@ def nonmand_tour_freq_model(
     condense_parameters=False,
     segment_subset=[],
     num_chunks=1,
+    *,
+    alts_in_cv_format=False,
 ):
     """
     Prepare nonmandatory tour frequency models for estimation.
@@ -248,6 +252,9 @@ def nonmand_tour_freq_model(
     alt_values = data.alt_values
     alt_def = data.alt_def
 
+    # deduplicate rows in alt_def
+    alt_def = alt_def[~alt_def.index.duplicated(keep="first")]
+
     m = {}
     for segment_name in segment_names:
         print(f"Creating larch model for {segment_name}")
@@ -272,18 +279,22 @@ def nonmand_tour_freq_model(
             .set_index("person_id")
             .rename(columns={"TAZ": "HOMETAZ"})
         )
-        print("\t performing cv to ca step")
-        # x_ca = cv_to_ca(alt_values[segment_name].set_index(["person_id", "variable"]))
-        x_ca = get_x_ca_df(
-            alt_values=alt_values[segment_name].set_index(["person_id", "variable"]),
-            name=segment_name,
-            edb_directory=edb_directory.format(name="non_mandatory_tour_frequency"),
-            num_chunks=num_chunks,
-        )
+        if alts_in_cv_format:
+            print("\t performing cv to ca step")
+            x_ca = get_x_ca_df(
+                alt_values=alt_values[segment_name].set_index(
+                    ["person_id", "variable"]
+                ),
+                name=segment_name,
+                edb_directory=edb_directory.format(name="non_mandatory_tour_frequency"),
+                num_chunks=num_chunks,
+            )
+        else:
+            x_ca = alt_values[segment_name].set_index(["person_id", "alt_id"])
 
         d_co = Dataset.construct.from_idco(
             x_co,
-            alts=alt_def.index.rename("altid"),
+            alts=alt_def.index.rename("alt_id"),
         )
         x_ca["_avail_"] = ~unavail(segment_model, x_ca)
         # we set crack to False here so that we do not dissolve zero variance IDCAs
