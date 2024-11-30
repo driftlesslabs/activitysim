@@ -30,6 +30,7 @@ import argparse
 import os
 import shutil
 import subprocess
+import time
 from pathlib import Path
 
 from activitysim.examples.external import download_external_example
@@ -69,7 +70,6 @@ def main(working_dir: Path, household_sample_size: int, skip_to_edb: bool = Fals
     pseudosurvey_dir = working_dir / "activitysim-prototype-mtc-extended" / "output"
 
     if not skip_to_edb:
-
         download_example(working_dir)
 
         subprocess.run(
@@ -146,6 +146,25 @@ def main(working_dir: Path, household_sample_size: int, skip_to_edb: bool = Fals
         ],
         check=True,
     )
+
+    # mark the entire created directory as ignored for git
+    edb_dir.joinpath(".gitignore").write_text("**\n")
+
+    # create a success.txt file to indicate that the EDB was successfully built
+    completed_at = time.strftime("%Y-%m-%d %H:%M:%S")
+    edb_dir.joinpath("success.txt").write_text(
+        f"Successfully built the full MTC estimation data bundle example with {household_sample_size} households.\n"
+        f"Completed at {completed_at}"
+    )
+
+
+def as_needed(working_dir: Path, household_sample_size: int):
+    """Check if the EDB directory has already been built. If not, build it."""
+    edb_dir = (
+        Path(working_dir) / "activitysim-prototype-mtc-extended" / "output-est-mode"
+    )
+    if not edb_dir.joinpath("success.txt").exists():
+        main(working_dir, household_sample_size)
 
 
 if __name__ == "__main__":
