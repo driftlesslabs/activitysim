@@ -111,6 +111,7 @@ def main(working_dir: Path, household_sample_size: int, skip_to_edb: bool = Fals
 
         output_dir = working_dir / "infer-output"
         output_dir.mkdir(parents=True, exist_ok=True)
+        output_dir.joinpath(".gitignore").write_text("**\n")
 
         subprocess.run(
             [
@@ -148,7 +149,7 @@ def main(working_dir: Path, household_sample_size: int, skip_to_edb: bool = Fals
     )
 
     # mark the entire created directory as ignored for git
-    edb_dir.joinpath(".gitignore").write_text("**\n")
+    edb_dir.parent.joinpath(".gitignore").write_text("**\n")
 
     # create a success.txt file to indicate that the EDB was successfully built
     completed_at = time.strftime("%Y-%m-%d %H:%M:%S")
@@ -165,6 +166,8 @@ def as_needed(working_dir: Path, household_sample_size: int):
     )
     if not edb_dir.joinpath("success.txt").exists():
         main(working_dir, household_sample_size)
+    else:
+        print("EDB directory already populated.")
 
 
 if __name__ == "__main__":
