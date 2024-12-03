@@ -161,8 +161,8 @@ def linear_utility_from_spec(
                 x_col,
                 seg_p_col,
                 ignore_x,
-                x_validator,
-                expr_col,
+                x_validator=x_validator,
+                expr_col=expr_col,
             ) * X(f"{segment_id}=={str_repr(segval)}")
         return sum(partial_utility.values())
     parts = []

@@ -392,6 +392,8 @@ def location_choice_model(
             x_col="Label",
             p_col=spec.columns[-1],
             ignore_x=("local_dist",),
+            x_validator=d,
+            expr_col="Expression",
         )
     elif (
         len(spec.columns) == 4
@@ -404,6 +406,8 @@ def location_choice_model(
             x_col="Label",
             p_col=spec.columns[-1],
             ignore_x=("local_dist",),
+            x_validator=d,
+            expr_col="Expression",
         )
     else:
         m.utility_ca = linear_utility_from_spec(
@@ -412,6 +416,8 @@ def location_choice_model(
             p_col=SEGMENT_IDS,
             ignore_x=("local_dist",),
             segment_id=CHOOSER_SEGMENT_COLUMN_NAME,
+            x_validator=d,
+            expr_col="Expression",
         )
 
     if CHOOSER_SEGMENT_COLUMN_NAME is None:
