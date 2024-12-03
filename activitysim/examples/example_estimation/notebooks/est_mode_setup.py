@@ -1,8 +1,17 @@
 from __future__ import annotations
 
 import os
+import shutil
 import sys
+import warnings
 from pathlib import Path
+
+# suppress RuntimeWarning from xarray
+warnings.filterwarnings(
+    "ignore",
+    category=RuntimeWarning,
+    module="xarray",
+)
 
 
 def prepare() -> Path:
@@ -26,4 +35,13 @@ def prepare() -> Path:
         / "activitysim-prototype-mtc-extended"
     )
     os.chdir(relative_path)
-    return relative_path
+    return Path(relative_path)
+
+
+def backup(filename: str | os.PathLike):
+    """Create or restore from a backup copy of a file."""
+    backup_filename = f"{filename}.bak"
+    if Path(backup_filename).exists():
+        shutil.copy(backup_filename, filename)
+    else:
+        shutil.copy(filename, backup_filename)

@@ -94,7 +94,7 @@ def simple_simulate_data(
     chooser_data_file="{name}_values_combined.csv",
     values_index_col="tour_id",
 ) -> SimpleSimulateData:
-    edb_directory = edb_directory.format(name=name)
+    edb_directory = str(edb_directory).format(name=name)
 
     def _read_csv(filename, **kwargs):
         filename = Path(edb_directory).joinpath(filename.format(name=name))
