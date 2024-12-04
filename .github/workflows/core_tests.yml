@@ -382,7 +382,7 @@ jobs:
     defaults:
       run:
         shell: bash -l {0}
-    name: estimation_mode_test
+    name: Estimation Mode Unit Tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -435,7 +435,7 @@ jobs:
     defaults:
       run:
         shell: bash -l {0}
-    name: estimation_mode_test
+    name: Estimation Notebooks Test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
