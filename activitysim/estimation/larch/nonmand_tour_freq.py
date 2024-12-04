@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import glob
 import logging
 import os
 import pickle
@@ -30,7 +31,7 @@ def interaction_simulate_data(
     coefficients_files="{segment_name}/{name}_coefficients_{segment_name}.csv",
     chooser_data_files="{segment_name}/{name}_choosers_combined.csv",
     alt_values_files="{segment_name}/{name}_interaction_expression_values.csv",
-    segment_subset=[],
+    segment_subset=(),
 ):
     edb_directory = edb_directory.format(name=name)
 
@@ -41,11 +42,36 @@ def interaction_simulate_data(
             if "comment" in kwargs:
                 kwargs.pop("comment")
             return pd.read_parquet(filename.with_suffix(".parquet"), **kwargs)
-        print("loading from", filename)
-        return pd.read_csv(filename, **kwargs)
+        if filename.exists():
+            print("loading from", filename)
+            return pd.read_csv(filename, **kwargs)
+        # if the file does not exist, try to load parquet from a subdirectory
+        search_glob = os.path.join(
+            edb_directory, "*", filename.with_suffix(".parquet").name
+        )
+        files = glob.glob(search_glob)
+        if files:
+            print("loading from", files[0])
+            return pd.read_parquet(files[0], **kwargs)
+        # otherwise try to load csv from a subdirectory
+        search_glob = os.path.join(edb_directory, "*", filename.name)
+        files = glob.glob(search_glob)
+        if files:
+            print("loading from", files[0])
+            return pd.read_csv(files[0], **kwargs)
+        raise FileNotFoundError(f"File {filename} not found")
 
     settings_file = settings_file.format(name=name)
-    with open(os.path.join(edb_directory, settings_file), "r") as yf:
+    settings_file_resolved = os.path.join(edb_directory, settings_file)
+    if not os.path.exists(settings_file_resolved):
+        search_glob = os.path.join(edb_directory, "*", settings_file)
+        settings_files = glob.glob(search_glob)
+        if not settings_files:
+            raise FileNotFoundError(f"Settings file {settings_file} not found")
+        else:
+            settings_file_resolved = settings_files[0]
+
+    with open(settings_file_resolved) as yf:
         settings = yaml.load(
             yf,
             Loader=yaml.SafeLoader,
@@ -209,7 +235,7 @@ def nonmand_tour_freq_model(
     edb_directory="output/estimation_data_bundle/{name}/",
     return_data=False,
     condense_parameters=False,
-    segment_subset=[],
+    segment_subset=(),
     num_chunks=1,
     *,
     alts_in_cv_format=False,
