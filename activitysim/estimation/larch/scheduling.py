@@ -240,38 +240,53 @@ def construct_availability_ca(model, chooser_data, alt_codes_to_names):
     return avail
 
 
-def mandatory_tour_scheduling_work_model(return_data=False):
+def mandatory_tour_scheduling_work_model(
+    edb_directory="output/estimation_data_bundle/{name}/", return_data=False
+):
     return schedule_choice_model(
         name="mandatory_tour_scheduling_work",
+        edb_directory=edb_directory,
         return_data=return_data,
         coefficients_file="tour_scheduling_work_coefficients.csv",
     )
 
 
-def mandatory_tour_scheduling_school_model(return_data=False):
+def mandatory_tour_scheduling_school_model(
+    edb_directory="output/estimation_data_bundle/{name}/", return_data=False
+):
     return schedule_choice_model(
         name="mandatory_tour_scheduling_school",
+        edb_directory=edb_directory,
         return_data=return_data,
         coefficients_file="tour_scheduling_school_coefficients.csv",
     )
 
 
-def non_mandatory_tour_scheduling_model(return_data=False):
+def non_mandatory_tour_scheduling_model(
+    edb_directory="output/estimation_data_bundle/{name}/", return_data=False
+):
     return schedule_choice_model(
         name="non_mandatory_tour_scheduling",
+        edb_directory=edb_directory,
         return_data=return_data,
     )
 
 
-def joint_tour_scheduling_model(return_data=False):
+def joint_tour_scheduling_model(
+    edb_directory="output/estimation_data_bundle/{name}/", return_data=False
+):
     return schedule_choice_model(
         name="joint_tour_scheduling",
+        edb_directory=edb_directory,
         return_data=return_data,
     )
 
 
-def atwork_subtour_scheduling_model(return_data=False):
+def atwork_subtour_scheduling_model(
+    edb_directory="output/estimation_data_bundle/{name}/", return_data=False
+):
     return schedule_choice_model(
         name="atwork_subtour_scheduling",
+        edb_directory=edb_directory,
         return_data=return_data,
     )
