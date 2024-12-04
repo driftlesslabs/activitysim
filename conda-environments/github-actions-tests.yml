@@ -37,5 +37,6 @@ dependencies:
 - simwrapper > 1.7
 - sparse
 - xarray = 2023.2.*
+- xlsxwriter = 3.2.*
 - zarr = 2.14.*
 - zstandard
