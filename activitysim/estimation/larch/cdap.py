@@ -399,15 +399,18 @@ def cdap_data(
         raise FileNotFoundError(edb_directory)
 
     def read_csv(filename, **kwargs):
-        filename = Path(edb_directory).joinpath(filename.format(name=name))
+        filename = Path(edb_directory).joinpath(filename.format(name=name)).resolve()
         if filename.with_suffix(".parquet").exists():
             if "comment" in kwargs:
                 del kwargs["comment"]
+            print(f"Reading {filename.with_suffix('.parquet')}")
             return pd.read_parquet(filename.with_suffix(".parquet"), **kwargs)
+        print(f"Reading {filename}")
         return pd.read_csv(filename, **kwargs)
 
     def read_yaml(filename, **kwargs):
         filename = filename.format(name=name)
+        print(f"Reading {os.path.join(edb_directory, filename)}")
         with open(os.path.join(edb_directory, filename), "rt") as f:
             return yaml.load(f, Loader=yaml.SafeLoader, **kwargs)
 
@@ -451,7 +454,7 @@ def cdap_data(
     except FileNotFoundError:
         joint_coef = None
         add_joint = False
-    print("Including joint tour utiltiy?:", add_joint)
+    print("Including joint tour utility?:", add_joint)
 
     spec1 = read_csv(spec1_file, comment="#")
     values = read_csv(chooser_data_file, comment="#")
