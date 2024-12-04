@@ -481,7 +481,10 @@ jobs:
           python -m pytest \
               activitysim/examples/example_estimation/notebooks/02_school_location.ipynb \
               activitysim/examples/example_estimation/notebooks/03_work_location.ipynb \
-              activitysim/examples/example_estimation/notebooks/04_auto_ownership.ipynb
+              activitysim/examples/example_estimation/notebooks/04_auto_ownership.ipynb \
+              activitysim/examples/example_estimation/notebooks/05_free_parking.ipynb \
+              activitysim/examples/example_estimation/notebooks/06_cdap.ipynb \
+              activitysim/examples/example_estimation/notebooks/07_mand_tour_freq.ipynb
 
   estimation_edb_creation:
     needs: foundation
