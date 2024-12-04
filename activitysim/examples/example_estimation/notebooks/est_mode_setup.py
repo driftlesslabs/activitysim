@@ -45,3 +45,7 @@ def backup(filename: str | os.PathLike):
         shutil.copy(backup_filename, filename)
     else:
         shutil.copy(filename, backup_filename)
+
+
+if __name__ == "__main__":
+    prepare()
