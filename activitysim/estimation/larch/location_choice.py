@@ -208,7 +208,6 @@ def location_choice_model(
             alt_values["variable"] = alt_values["variable"].map(expression_labels)
         else:
             alt_values = alt_values.rename(columns=expression_labels)
-            print("MAPOING", expression_labels)
         label_column_name = "Label"
 
     if name == "trip_destination":
