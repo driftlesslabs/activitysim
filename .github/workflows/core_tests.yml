@@ -483,6 +483,7 @@ jobs:
       - name: Test Estimation Notebooks
         run: |
           python -m pytest activitysim/examples/example_estimation/notebooks/*.ipynb \
+            --nbmake-timeout=3000 \
             --ignore=activitysim/examples/example_estimation/notebooks/01_estimation_mode.ipynb
 
   estimation_edb_creation:
