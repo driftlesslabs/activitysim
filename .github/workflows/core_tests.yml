@@ -478,7 +478,7 @@ jobs:
 
       - name: Create Estimation Data
         run: |
-          python activitysim/examples/example_estimation/notebooks/est_mode_setup.py
+          python activitysim/examples/example_estimation/notebooks/est_mode_setup.py --household_sample_size 5000
 
       - name: Test Estimation Notebooks
         run: |

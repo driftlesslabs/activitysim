@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import os
 import shutil
 import sys
@@ -65,4 +66,18 @@ def backup(filename: str | os.PathLike):
 
 
 if __name__ == "__main__":
-    prepare()
+    parser = argparse.ArgumentParser(description="Prepare the example for estimation.")
+    parser.add_argument(
+        "--household_sample_size",
+        type=int,
+        default=20_000,
+        help="The number of households to sample from the synthetic population.",
+    )
+    parser.add_argument(
+        "--subdir",
+        type=str,
+        default="test-estimation-data",
+        help="The subdirectory to store the example data.",
+    )
+    args = parser.parse_args()
+    prepare(args.household_sample_size, args.subdir)
