@@ -76,7 +76,7 @@ class EstimationConfig(PydanticReadable):
     if you do not care about the estimation output for all models.
     """
     EDB_FILETYPE: Literal["csv", "parquet", "pkl"] = "csv"
-    EDB_ALTS_FILE_FORMAT: Literal["verbose", "compact"] = "verbose"
+    EDB_ALTS_FILE_FORMAT: Literal["verbose", "compact"] = "compact"
     """Format of the alternatives table in the estimation data bundle.
 
     verbose: every possible alternative is listed in the table
