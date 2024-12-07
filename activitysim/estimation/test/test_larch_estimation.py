@@ -107,6 +107,7 @@ def test_location_model(
     m, data = component_model(name, return_data=True)
     m.load_data()
     loglike_prior = m.loglike()
+    m.doctor(repair_av_zq="-")
     r = m.maximize_loglike(method=method, options={"maxiter": 1000, "ftol": 1.0e-8})
     num_regression.check(
         {"loglike_prior": loglike_prior, "loglike_converge": r.loglike},
