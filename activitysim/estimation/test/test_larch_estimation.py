@@ -110,7 +110,7 @@ def test_location_model(
     r = m.maximize_loglike(method=method, options={"maxiter": 1000, "ftol": 1.0e-8})
     num_regression.check(
         {"loglike_prior": loglike_prior, "loglike_converge": r.loglike},
-        basename=f"test_loc_{name}_loglike",
+        basename=f"test_loc_{name}_{method}_loglike",
     )
     _regression_check(dataframe_regression, m.pf, rtol=rtol)
     size_spec = update_size_spec(
@@ -121,7 +121,7 @@ def test_location_model(
     )
     dataframe_regression.check(
         size_spec,
-        basename=f"test_loc_{name}_size_spec",
+        basename=f"test_loc_{name}_{method}_size_spec",
         default_tolerance=dict(atol=1e-6, rtol=5e-2)
         # set a little loose, as there is sometimes a little variance in these
         # results when switching backend implementations.
