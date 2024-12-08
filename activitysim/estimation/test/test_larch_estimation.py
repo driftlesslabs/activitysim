@@ -105,7 +105,7 @@ def test_location_model(
     from activitysim.estimation.larch import component_model, update_size_spec
 
     m, data = component_model(name, return_data=True)
-    m.doctor(repair_av_zq="-")
+    m.doctor(repair_av_zq="-", nan_utility=True)
     loglike_prior = m.loglike()
     r = m.maximize_loglike(method=method, options={"maxiter": 1000, "ftol": 1.0e-8})
     num_regression.check(
