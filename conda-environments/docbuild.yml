@@ -24,7 +24,7 @@ dependencies:
 - jupyter-book
 - jupyterlab
 - matplotlib
-- multimethod < 2.0
+- multimethod <2.0
 - myst-nb
 - myst-parser
 - numba >= 0.57
