@@ -160,6 +160,9 @@ def unavail(model, x_ca):
         unav = x_ca[lock_data[0]] > 0
         for j in lock_data[1:]:
             unav |= x_ca[j] > 0
+    else:
+        # no unavailability parameters are included
+        return pd.DataFrame(0, index=x_ca.index, columns=["_avail_"])
     return unav
 
 
