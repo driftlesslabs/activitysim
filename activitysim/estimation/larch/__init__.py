@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import larch as lx
 from packaging.version import Version
 
 from .cdap import *
@@ -12,6 +11,12 @@ from .nonmand_tour_freq import *
 from .scheduling import *
 from .simple_simulate import *
 from .stop_frequency import *
+
+try:
+    import larch as lx
+except ImportError:
+    lx = None
+
 
 # require larch version 6.0.0 or later
 if Version(larch.__version__) < Version("6.0.0"):

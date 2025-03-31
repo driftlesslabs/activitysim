@@ -20,6 +20,14 @@ from .general import (
     str_repr,
 )
 
+try:
+    import larch
+except ImportError:
+    larch = None
+else:
+    from larch import DataFrames, Model, P, X
+    from larch.util import Dict
+
 
 def schedule_choice_model(
     name,

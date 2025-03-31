@@ -18,6 +18,14 @@ from .general import (
     remove_apostrophes,
 )
 
+try:
+    import larch
+except ImportError:
+    larch = None
+else:
+    from larch import DataFrames, Model
+    from larch.util import Dict
+
 
 def construct_availability(model, chooser_data, alt_codes_to_names):
     """

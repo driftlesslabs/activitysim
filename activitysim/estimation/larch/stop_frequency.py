@@ -16,6 +16,14 @@ from .general import (
     remove_apostrophes,
 )
 
+try:
+    import larch
+except ImportError:
+    larch = None
+else:
+    from larch import DataFrames, Model
+    from larch.util import Dict
+
 
 def stop_frequency_data(
     edb_directory="output/estimation_data_bundle/{name}/",
@@ -183,7 +191,6 @@ def stop_frequency_model(
     models = []
 
     for n in range(len(data.spec)):
-
         coefficients = data.coefficients
         # coef_template = data.coef_template # not used
         spec = data.spec[n]

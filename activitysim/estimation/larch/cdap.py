@@ -7,17 +7,24 @@ import os
 import re
 from pathlib import Path
 
-import larch
 import numpy as np
 import pandas as pd
 import xarray as xr
 import yaml
-from larch import Dataset, Model, P, X
-from larch.model.model_group import ModelGroup
-from larch.util import Dict
 
 from ...abm.models.util import cdap
 from .general import apply_coefficients, explicit_value_parameters
+
+try:
+    import larch as lx
+except ImportError:
+    lx = None
+    logger_name = "larch"
+else:
+    from larch import Dataset, Model, P, X
+    from larch.model.model_group import ModelGroup
+    from larch.util import Dict
+
 
 _logger = logging.getLogger("larch")
 
@@ -151,7 +158,6 @@ def interact_pattern(n_persons, select_persons, tag):
 
 
 def cdap_interaction_utility(model, n_persons, alts, interaction_coef, coefficients):
-
     person_numbers = list(range(1, n_persons + 1))
 
     matcher = re.compile("coef_[HMN]_.*")

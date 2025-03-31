@@ -11,8 +11,6 @@ from typing import Collection
 import numpy as np
 import pandas as pd
 import yaml
-from larch import Dataset, Model, P, X
-from larch.util import Dict
 
 from .general import (
     apply_coefficients,
@@ -23,6 +21,14 @@ from .general import (
     remove_apostrophes,
     str_repr,
 )
+
+try:
+    import larch
+except ImportError:
+    larch = None
+else:
+    from larch import Dataset, Model, P, X
+    from larch.util import Dict
 
 
 def size_coefficients_from_spec(size_spec):
