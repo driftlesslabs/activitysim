@@ -28,7 +28,7 @@ which is not included in scipy but is usually efficient for simple
 choice models.  When constraints or bounds are present, by default Larch uses the
 Larch uses the `scipy.optimize.minimize` function with the `SLSQP` algorithm when
 constraints or bounds are present.  The `larch.Model.estimate` method allows the
-user to specify the optimization algorithm to use via the `mathod` argument, which
+user to specify the optimization algorithm to use via the `method` argument, which
 can be set to 'BHHH', 'SLSQP', or any other algorithm supported by `scipy.optimize.minimize`.
 If you are estimating a model and find the optimization is not converging as
 fast as expected (or at all), you may want to try a different optimization algorithm.
