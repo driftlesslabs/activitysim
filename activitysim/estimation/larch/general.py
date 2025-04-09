@@ -9,9 +9,11 @@ import numpy as np
 import pandas as pd
 
 try:
-    import larch
+    # Larch is an optional dependency, and we don't want to fail when importing
+    # this module simply because larch is not installed.
+    import larch as lx
 except ImportError:
-    larch = None
+    lx = None
 else:
     from larch import Model, P, X  # noqa: F401
     from larch.model.tree import NestingTree

@@ -17,11 +17,12 @@ from .general import (
 )
 
 try:
-    import larch
+    # Larch is an optional dependency, and we don't want to fail when importing
+    # this module simply because larch is not installed.
+    import larch as lx
 except ImportError:
-    larch = None
+    lx = None
 else:
-    from larch import DataFrames, Model
     from larch.util import Dict
 
 

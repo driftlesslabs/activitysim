@@ -23,11 +23,12 @@ from .general import (
 )
 
 try:
-    import larch
+    # Larch is an optional dependency, and we don't want to fail when importing
+    # this module simply because larch is not installed.
+    import larch as lx
 except ImportError:
-    larch = None
+    lx = None
 else:
-    from larch import Dataset, Model, P, X
     from larch.util import Dict
 
 
@@ -78,7 +79,7 @@ def location_choice_model(
     *,
     alts_in_cv_format=False,
     availability_expression=None,
-) -> Model | tuple[Model, LocationChoiceData]:
+) -> lx.Model | tuple[lx.Model, LocationChoiceData]:
     """
     Construct a location choice model from the estimation data bundle.
 
@@ -431,13 +432,13 @@ def location_choice_model(
     assert len(x_co) > 0, "Empty chooser dataframe"
     assert len(x_ca_1) > 0, "Empty alternatives dataframe"
 
-    d_ca = Dataset.construct.from_idca(x_ca_1)
-    d_co = Dataset.construct.from_idco(x_co)
+    d_ca = lx.Dataset.construct.from_idca(x_ca_1)
+    d_co = lx.Dataset.construct.from_idco(x_co)
     d = d_ca.merge(d_co)
     if av is not None:
         d["_avail_"] = av
 
-    m = Model(datatree=d, compute_engine="numba")
+    m = lx.Model(datatree=d, compute_engine="numba")
 
     # One of the alternatives might be coded as 0, so
     # we need to explicitly initialize the MNL nesting graph
@@ -486,16 +487,16 @@ def location_choice_model(
     if CHOOSER_SEGMENT_COLUMN_NAME is None:
         assert len(size_spec) == 1
         m.quantity_ca = sum(
-            P(f"{i}_{q}") * X(q)
+            lx.P(f"{i}_{q}") * lx.X(q)
             for i in size_spec.index
             for q in size_spec.columns
             if size_spec.loc[i, q] != 0
         )
     else:
         m.quantity_ca = sum(
-            P(f"{i}_{q}")
-            * X(q)
-            * X(f"{CHOOSER_SEGMENT_COLUMN_NAME}=={str_repr(SEGMENT_IDS[i])}")
+            lx.P(f"{i}_{q}")
+            * lx.X(q)
+            * lx.X(f"{CHOOSER_SEGMENT_COLUMN_NAME}=={str_repr(SEGMENT_IDS[i])}")
             for i in size_spec.index
             for q in size_spec.columns
             if size_spec.loc[i, q] != 0
