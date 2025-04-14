@@ -228,12 +228,6 @@ def stop_frequency_model(
         d = Dataset.construct.from_idco(
             chooser_data, alts=dict(zip(alt_codes, alt_names))
         )
-        # d = DataFrames(
-        #     co=chooser_data,
-        #     av=avail,
-        #     alt_codes=alt_codes,
-        #     alt_names=alt_names,
-        # )
 
         m.datatree = d
         m.choice_co_code = "override_choice_code"

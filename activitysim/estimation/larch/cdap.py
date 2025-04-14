@@ -360,33 +360,6 @@ def cdap_dataframes(households, values, add_joint) -> dict[int, lx.Dataset]:
     return dfs
 
 
-# def _cdap_model(households, values, spec1, interaction_coef, coefficients):
-#     cdap_data = cdap_dataframes(households, values)
-#     m = {}
-#     _logger.info(f"building for model 1")
-#     m[1] = Model(dataservice=cdap_data[1])
-#     cdap_base_utility_by_person(m[1], n_persons=1, spec=spec1)
-#     m[1].choice_any = True
-#     m[1].availability_any = True
-#
-#     # Add cardinality into interaction_coef if not present
-#     if 'cardinality' not in interaction_coef:
-#         interaction_coef['cardinality'] = interaction_coef['interaction_ptypes'].str.len()
-#     for s in [2, 3, 4, 5]:
-#         _logger.info(f"building for model {s}")
-#         m[s] = Model(dataservice=cdap_data[s])
-#         alts = generate_alternatives(s)
-#         cdap_base_utility_by_person(m[s], s, spec1, alts, values.columns)
-#         cdap_interaction_utility(m[s], s, alts, interaction_coef, coefficients)
-#         m[s].choice_any = True
-#         m[s].availability_any = True
-#
-#     result = ModelGroup(m.values())
-#     explicit_value_parameters(result)
-#     apply_coefficients(coefficients, result)
-#     return result
-
-
 def cdap_data(
     name="cdap",
     edb_directory="output/estimation_data_bundle/{name}/",
