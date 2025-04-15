@@ -61,6 +61,24 @@ of Larch, particularly as they relate to ActivitySim, as there are a few subtle
 differences between the two packages that users should be aware of when
 estimating models.
 
+### Setting up Larch Models
+
+ActivitySim includes a number of scripts and tools to set up Larch models
+for estimation.  The `activitysim.estimation.larch` library includes
+functions to read the EDBs written by ActivitySim and convert them into
+Larch models, including a generic [`component_model`](activitysim.estimation.larch.component_model)
+function that can be used to load the data and set up Larch for any standard ActivitySim component.
+This function is demonstrated in the [example notebooks](#example-notebooks).
+
+When given a truthy `return_data` argument, the `component_model` function
+will return a 2-tuple of the Larch model and the data used to create it.  The
+data as the second element of this tuple should be treated as a *copy* of the
+data used to create the model, and is provided primarily for the user to review
+and use in debugging if needed. If it is necessary to modify the data (e.g. to
+recreate temporary variables), the user should modify the `data` attribute of
+the model itself (i.e. `model.data` if `model` is the first element of the
+returned tuple), not the data returned in the second element of the tuple.
+
 ### Maximum Likelihood Estimation
 
 The approach used to estimate the parameters of a discrete choice model is
