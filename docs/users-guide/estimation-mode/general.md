@@ -150,12 +150,35 @@ render it effectively unavailable in the choice model.  If *all* the alternative
 are made unavailable in this manner, this can result in a condition where no
 alternative can be chosen, and ActivitySim will raise an error.
 
-Larch, on the other hand, does typically use this approach to express alternative
-availability.  Instead, Larch defines the availability of alternatives as a separate
-array of values, which is not included in the utility function.  This is typically
-more robust in estimation, as the computational engine can automatically shift
-the utility values to avoid numerical underflow or overflow issues that can arise
-when some choices are very unlikely but not strictly unavailable.
+When estimating models in Larch for use with ActivitySim, it is totally acceptable and
+appropriate to use this approach to express alternative availability,
+by embedding it in the utility function. This will greatly simplify the process
+of subsequently transferring the resulting model specification and parameters
+back to the ActivitySim model.  However, it is important to note that this
+approach is not the only way to express alternative availability in Larch.
+
+Larch includes a system to define the availability of alternatives explicitly as a
+[separate array of values](https://larch.driftless.xyz/dev/user-guide/choice-models.html#availability),
+which is not included in the utility function.  This is
+more robust in estimation, as the Larch computational engine can (and will)
+automatically shift the utility values to avoid numerical underflow or overflow
+issues that can arise when some choices are very unlikely but not strictly unavailable.
+When using the ActivitySim style of expressing alternative availability, the onus
+is entirely on the user to ensure that the utility values are not so large or small
+that they cause numerical problems. If this is not checked, it is possible that
+the model will appear to be estimating correctly in Larch, but the resulting model
+will underflow in ActivitySim, resulting in an error when the model is run.
+
+The scripts that build Larch models from estimation data bundles
+(`activitysim.estimation.larch`) will attempt to identify unavailability flags
+in the utility specifications, and when such flags are found it will automatically
+convert them to the Larch availability array format. However, since specification
+files can be complex, and the unavailability flags can be expressed in many different
+ways, it is possible that the automatic detection will not always work as expected.
+It is a good idea to check the
+[choice and availability summary](https://larch.driftless.xyz/dev/user-guide/analysis.html#choice-and-availability-summary)
+on the Larch model to confirm that the availability of alternatives is being
+processes as expected.
 
 ### Components that have Related Models
 
