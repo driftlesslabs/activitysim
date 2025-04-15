@@ -86,6 +86,24 @@ can be set to 'BHHH', 'SLSQP', or any other algorithm supported by `scipy.optimi
 If you are estimating a model and find the optimization is not converging as
 fast as expected (or at all), you may want to try a different optimization algorithm.
 
+### Model Evaluation
+
+The `larch.Model` class includes a number of methods for evaluating the
+quality of each estimated model. These tools are explained in
+[detail](https://larch.driftless.xyz/v6.0/user-guide/analysis.html) in the
+Larch documentation.
+
+A [simple aggregate analysis](https://larch.driftless.xyz/v6.0/user-guide/analysis.html#choice-and-availability-summary)
+of a Larch model data’s choice and availability statistics is available.
+
+Larch also includes methods to
+[analyze model predictions](https://larch.driftless.xyz/v6.0/user-guide/analysis.html#analyze-predictions)
+across various dimensions. The `analyze_predictions_co` method can be used to
+examine how well the model predicts choices against any available (or computable)
+attribute of the chooser. In addition, there are tools to evaluate
+[demand elasticity](https://larch.driftless.xyz/v6.0/user-guide/analysis.html#elasticity)
+with respect to changes in underlying data.
+
 ### Model Overspecification
 
 When using ActivitySim for simulation, there are generally few limitations or
