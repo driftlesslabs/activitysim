@@ -1,54 +1,4 @@
-
-# Estimation Mode
-
-ActivitySim includes the ability to re-estimate submodels using choice model estimation
-tools. It is possible to output the data needed for estimation and then use more or less
-any parameter estimation tool to find the best-fitting parameters for each model, but
-ActivitySim has a built-in integration with the [`larch`](https://larch.driftless.xyz)
-package, which is an open source Python package for estimating discrete choice models.
-
-## Estimation Workflow, Summarized
-
-The general workflow for estimating models is shown in the following figures and
-explained in more detail below.
-
-![estimation workflow](https://activitysim.github.io/activitysim/develop/_images/estimation_tools.jpg)
-
-First, the user converts their household travel survey into ActivitySim-format
-households, persons, tours, joint tour participants, and trip tables.  The
-households and persons tables must have the same fields as the synthetic population
-input tables since the surveyed households and persons will be run through the same
-set of submodels as the simulated households and persons.
-
-The ActivitySim estimation example [``scripts\infer.py``](https://github.com/ActivitySim/activitysim/blob/main/activitysim/examples/example_estimation/scripts/infer.py)
-module reads the ActivitySim-format household travel survey files and checks for
-inconsistencies in the input tables versus the model design, and calculates
-additional fields such as the household joint tour frequency based on the trips
-and joint tour participants table.  Survey households and persons observed choices
-much match the model design (i.e. a person cannot have more work tours than the model
-allows).
-
-ActivitySim is then run in estimation mode to read the ActivitySim-format
-travel survey files, and apply the ActivitySim submodels to write estimation data bundles
-(EDBs) that contains the model utility specifications, coefficients, chooser data,
-and alternatives data for each submodel.
-
-The relevant EDBs are read and transformed into the format required by the model
-estimation tool (i.e. larch) and then the coefficients are re-estimated. The
-``activitysim.estimation.larch`` library is included for integration with larch
-and there is a Jupyter Notebook estimation example for most core submodels.
-Certain kinds of changes to the model specification are allowed during the estimation
-process, as long as the required data fields are present in the EDB.  For example,
-the user can add new expressions that transform existing data, such as converting
-a continuous variable into a categorical variable, a polynomial transform, or a
-piecewise linear form.  More intensive changes to the model specification, such as
-adding data that is not in the EDB, or adding new alternatives, are generally not
-possible without re-running the estimation mode to write a new EDB.
-
-Based on the results of the estimation, the user can then update the model
-specification and coefficients file(s) for the estimated submodel.
-
-## Estimating ActivitySim Models with Larch
+# Using Larch
 
 ActivitySim component models are mostly built as discrete choice models.  The
 parameters for these models typically need to be estimated based on observed
@@ -61,7 +11,7 @@ of Larch, particularly as they relate to ActivitySim, as there are a few subtle
 differences between the two packages that users should be aware of when
 estimating models.
 
-### Setting up Larch Models
+## Setting up Larch Models
 
 ActivitySim includes a number of scripts and tools to set up Larch models
 for estimation.  The `activitysim.estimation.larch` library includes
@@ -79,7 +29,7 @@ recreate temporary variables), the user should modify the `data` attribute of
 the model itself (i.e. `model.data` if `model` is the first element of the
 returned tuple), not the data returned in the second element of the tuple.
 
-### Maximum Likelihood Estimation
+## Maximum Likelihood Estimation
 
 The approach used to estimate the parameters of a discrete choice model is
 maximum likelihood estimation (MLE).  The goal of MLE is to find the set of
@@ -104,7 +54,7 @@ can be set to 'BHHH', 'SLSQP', or any other algorithm supported by `scipy.optimi
 If you are estimating a model and find the optimization is not converging as
 fast as expected (or at all), you may want to try a different optimization algorithm.
 
-### Model Evaluation
+## Model Evaluation
 
 The `larch.Model` class includes a number of methods for evaluating the
 quality of each estimated model. These tools are explained in
@@ -122,7 +72,7 @@ attribute of the chooser. In addition, there are tools to evaluate
 [demand elasticity](https://larch.driftless.xyz/v6.0/user-guide/analysis.html#elasticity)
 with respect to changes in underlying data.
 
-### Model Overspecification
+## Model Overspecification
 
 When using ActivitySim for simulation, there are generally few limitations or
 requirements on the uniqueness of data elements. For example, it may end up being
@@ -138,7 +88,7 @@ have flat areas and will not have a unique maximum.  This is called "model overs
 In Larch, the user is warned if an estimated model appears to be overspecified,
 see the Larch documentation [for details](https://larch.driftless.xyz/v6.0/user-guide/choice-models.html#overspecification).
 
-### Recreating Temporary Variables
+## Recreating Temporary Variables
 
 When writing out estimation data bundles, ActivitySim may omit certain
 temporary variables included in a model spec.  For example, in the example
@@ -176,7 +126,7 @@ is not sufficient to manipulate `data` itself, we must manipulate `model.data`
 or otherwise re-attach any data changes to the model, or else the changes will
 not show up in estimation.
 
-### Expressing Alternative Availability
+## Expressing Alternative Availability
 
 In ActivitySim, the unavailability of alternatives is typically expressed in the
 utility function given in the model specification, by including a indicator variable
@@ -216,7 +166,7 @@ It is a good idea to check the
 on the Larch model to confirm that the availability of alternatives is being
 processes as expected.
 
-### Components that have Related Models
+## Components that have Related Models
 
 Within ActivitySim, it is possible for multiple parts of model components
 to share a common set of coefficients.  It is even possible for completely
@@ -261,7 +211,7 @@ the same as for a single model, including finding parameter estimates, the stand
 error of those estimates, and any statistical tests or interpretations that are
 desired.
 
-### Components with Size Terms
+## Components with Size Terms
 
 Location choice models in ActivitySim (and in discrete choice modeling
 in general) usually include a "size" term.  The size term is a measure

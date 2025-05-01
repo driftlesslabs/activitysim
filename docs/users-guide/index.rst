@@ -44,7 +44,7 @@ Contents
    visualization
    example_models
    example_performance
-   estimation-mode/general
+   estimation-mode/index
    .. toctree::
    :maxdepth: 1
    other_examples
