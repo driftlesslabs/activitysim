@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Redirect Page</title>
+    <script>
+        window.onload = function() {
+            const params = new URLSearchParams(window.location.search);
+            const query = params.get('query');
+
+            if (query === 'home') {
+                window.location.href = 'https://www.activitysim.org';
+            } else if (query === 'skims') {
+                window.location.href = 'https://driftlesslabs.github.io/activitysim/skim-name-conflicts/users-guide/model_anatomy.html#skims';
+            } else {
+                window.location.href = 'https://driftlesslabs.github.io/activitysim/skim-name-conflicts/index.html';
+            }
+        };
+    </script>
+</head>
+<body>
+    <p>Redirecting...</p>
+</body>
+</html>
