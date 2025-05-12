@@ -7,14 +7,14 @@
     <script>
         window.onload = function() {
             const params = new URLSearchParams(window.location.search);
-            const query = params.get('query');
+            const query = params.get('q');
 
             if (query === 'home') {
                 window.location.href = 'https://www.activitysim.org';
             } else if (query === 'skims') {
                 window.location.href = 'https://driftlesslabs.github.io/activitysim/skim-name-conflicts/users-guide/model_anatomy.html#skims';
             } else {
-                window.location.href = 'https://driftlesslabs.github.io/activitysim/skim-name-conflicts/index.html';
+                window.location.href = 'https://activitysim.github.io/activitysim';
             }
         };
     </script>
