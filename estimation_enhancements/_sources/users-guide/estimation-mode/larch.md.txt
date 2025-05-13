@@ -29,6 +29,29 @@ recreate temporary variables), the user should modify the `data` attribute of
 the model itself (i.e. `model.data` if `model` is the first element of the
 returned tuple), not the data returned in the second element of the tuple.
 
+## Model Specification
+
+By default, the process of estimating parameters for ActivitySim model components
+with Larch is based on the existing model specification files.  These are the
+CSV files that are used to define the utility function for each logit component.
+When running ActivitySim, these files are typically found in the configs directory,
+but when running in estimation mode, they are written out to the EDB as well, which
+is where the `activitysim.estimation.larch` library functions look for these
+input files.
+
+Users are not limited to using the existing model specification files, however. The
+Larch tools for model estimation now allow users to modify the model specification
+files, and then re-estimate the model, including existing and new parameters.
+The revised model specification files must rely on the same data that has already
+been written out to the EDB, but the user can add new expressions to the specification
+to transform the data, or to create new variables.  This is particularly useful
+for creating new piecewise linear transformations, or for creating new categorical
+variables from continuous variables.  The user can also add new variables to the
+specification that are not in the EDB, but this will require re-running ActivitySim
+in estimation mode to write a new EDB.  Examples for how to re-specify the model
+specification files are included in
+[selected example notebooks](#examples-that-include-re-specification).
+
 ## Maximum Likelihood Estimation
 
 The approach used to estimate the parameters of a discrete choice model is

@@ -40,7 +40,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=e4271f3b"></script>
+    <script src="../../_static/documentation_options.js?v=b371d519"></script>
     <script src="../../_static/doctools.js?v=9a2dae69"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
@@ -426,6 +426,28 @@ recreate temporary variables), the user should modify the <code class="docutils 
 the model itself (i.e. <code class="docutils literal notranslate"><span class="pre">model.data</span></code> if <code class="docutils literal notranslate"><span class="pre">model</span></code> is the first element of the
 returned tuple), not the data returned in the second element of the tuple.</p>
 </section>
+<section id="model-specification">
+<h2>Model Specification<a class="headerlink" href="#model-specification" title="Link to this heading">#</a></h2>
+<p>By default, the process of estimating parameters for ActivitySim model components
+with Larch is based on the existing model specification files.  These are the
+CSV files that are used to define the utility function for each logit component.
+When running ActivitySim, these files are typically found in the configs directory,
+but when running in estimation mode, they are written out to the EDB as well, which
+is where the <code class="docutils literal notranslate"><span class="pre">activitysim.estimation.larch</span></code> library functions look for these
+input files.</p>
+<p>Users are not limited to using the existing model specification files, however. The
+Larch tools for model estimation now allow users to modify the model specification
+files, and then re-estimate the model, including existing and new parameters.
+The revised model specification files must rely on the same data that has already
+been written out to the EDB, but the user can add new expressions to the specification
+to transform the data, or to create new variables.  This is particularly useful
+for creating new piecewise linear transformations, or for creating new categorical
+variables from continuous variables.  The user can also add new variables to the
+specification that are not in the EDB, but this will require re-running ActivitySim
+in estimation mode to write a new EDB.  Examples for how to re-specify the model
+specification files are included in
+<a class="reference internal" href="#examples-that-include-re-specification">selected example notebooks</a>.</p>
+</section>
 <section id="maximum-likelihood-estimation">
 <h2>Maximum Likelihood Estimation<a class="headerlink" href="#maximum-likelihood-estimation" title="Link to this heading">#</a></h2>
 <p>The approach used to estimate the parameters of a discrete choice model is
@@ -706,6 +728,7 @@ unique among the ActivitySim component models.</p></li>
   <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
     <ul class="visible nav section-nav flex-column">
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#setting-up-larch-models">Setting up Larch Models</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#model-specification">Model Specification</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#maximum-likelihood-estimation">Maximum Likelihood Estimation</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#model-evaluation">Model Evaluation</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#model-overspecification">Model Overspecification</a></li>
@@ -752,7 +775,7 @@ unique among the ActivitySim component models.</p></li>
       
         <div class="footer-item"><!-- This will display the version of the docs -->
 <p class="last-updated">
-ActivitySim 1.3.3.dev74+g44ae846b, documentation last updated May 13, 2025.<br/>
+ActivitySim 1.3.3.dev75+gb24d44af, documentation last updated May 13, 2025.<br/>
 </p></div>
       
         <div class="footer-item">
