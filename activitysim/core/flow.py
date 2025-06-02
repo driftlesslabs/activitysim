@@ -51,6 +51,16 @@ if os.environ.get("TRAVIS") == "true":
 
 @contextlib.contextmanager
 def logtime(tag, tag2=""):
+    """
+    Context manager for logging the time taken by a code block.
+
+    Parameters
+    ----------
+    tag : str
+        Main tag for the log message.
+    tag2 : str, optional
+        Additional tag for the log message.
+    """
     logger.info(f"begin {tag} {tag2}")
     t0 = time.time()
     try:
@@ -63,6 +73,15 @@ def logtime(tag, tag2=""):
 
 
 class TimeLogger:
+    """
+    Helper class for logging elapsed time for code sections.
+
+    Parameters
+    ----------
+    tag1 : str
+        Main tag for the logger.
+    """
+
     aggregate_timing = {}
 
     def __init__(self, tag1):
@@ -121,7 +140,19 @@ class TimeLogger:
 
 def only_simple(x, exclude_keys=()):
     """
-    All the values in a dict that are plain numbers, strings, or lists or tuples thereof.
+    Extract all values in a dict that are plain numbers, strings, or lists/tuples thereof.
+
+    Parameters
+    ----------
+    x : dict
+        Dictionary to filter.
+    exclude_keys : tuple, optional
+        Keys to exclude from the result.
+
+    Returns
+    -------
+    dict
+        Filtered dictionary.
     """
     y = {}
     for k, v in x.items():
@@ -144,6 +175,33 @@ def get_flow(
     zone_layer=None,
     compute_settings: ComputeSettings | None = None,
 ):
+    """
+    Create a new sharrow flow for a given spec and context.
+
+    Parameters
+    ----------
+    state : workflow.State
+        The workflow state object.
+    spec : pandas.DataFrame
+        Model spec DataFrame.
+    local_d : dict
+        Local variables dictionary.
+    trace_label : str, optional
+        Label for tracing/logging.
+    choosers : pandas.DataFrame, optional
+        Chooser DataFrame.
+    interacts : pandas.DataFrame, optional
+        Interaction DataFrame.
+    zone_layer : str, optional
+        Zone layer for skims.
+    compute_settings : ComputeSettings, optional
+        Compute settings for sharrow.
+
+    Returns
+    -------
+    sharrow.Flow
+        The created flow object.
+    """
     extra_vars = only_simple(local_d)
     orig_col_name = local_d.get("orig_col_name", None)
     dest_col_name = local_d.get("dest_col_name", None)
@@ -193,19 +251,19 @@ def get_flow(
 
 def should_invalidate_cache_file(cache_filename, *source_filenames):
     """
-    Check if a cache file should be invalidated.
-
-    It should be invalidated if any source file has a modification time
-    more recent than the cache file modification time.
+    Check if a cache file should be invalidated based on source file modification times.
 
     Parameters
     ----------
-    cache_filename : Path-like
-    source_filenames : Collection[Path-like]
+    cache_filename : str or Path
+        Path to the cache file.
+    source_filenames : list of str or Path
+        Source files to compare modification times.
 
     Returns
     -------
     bool
+        True if cache should be invalidated, else False.
     """
     try:
         stat0 = os.stat(cache_filename)
@@ -225,11 +283,15 @@ def scan_for_unused_names(state: workflow.State, tokens):
 
     Parameters
     ----------
-    tokens : Collection[str]
+    state : workflow.State
+        The workflow state object.
+    tokens : collection of str
+        Tokens to search for.
 
     Returns
     -------
-    Set[str]
+    set of str
+        Set of unused tokens.
     """
     configs_dir_list = state.filesystem.get_configs_dir()
     configs_dir_list = (
@@ -271,6 +333,35 @@ def skims_mapping(
     primary_origin_col_name=None,
     predigitized_time_periods=False,
 ):
+    """
+    Create a mapping of skims for use in flows, based on column names and context.
+
+    Parameters
+    ----------
+    state : workflow.State
+        The workflow state object.
+    orig_col_name : str
+        Name of the origin column.
+    dest_col_name : str
+        Name of the destination column.
+    timeframe : str, optional
+        Timeframe for the skims (default is 'tour').
+    stop_col_name : str, optional
+        Name of the stop column.
+    parking_col_name : str, optional
+        Name of the parking column.
+    zone_layer : str, optional
+        Zone layer for skims.
+    primary_origin_col_name : str, optional
+        Name of the primary origin column.
+    predigitized_time_periods : bool, optional
+        Whether time periods are pre-digitized.
+
+    Returns
+    -------
+    dict
+        Mapping of skims and relationships.
+    """
     logger.info("loading skims_mapping")
     logger.info(f"- orig_col_name: {orig_col_name}")
     logger.info(f"- dest_col_name: {dest_col_name}")
@@ -477,57 +568,43 @@ def new_flow(
 
     Parameters
     ----------
+    state : workflow.State
+        The workflow state object.
     spec : pandas.DataFrame
-        The spec, as usual for ActivitySim. The index should either be a basic
-        single-level index containing the expressions to be evaluated, or a
-        MultiIndex with at least "Expression" and "Label" levels.
-    extra_vars : Mapping
-        Extra values that are available to expressions and which are written
-        explicitly into compiled code (and cannot be changed later).
+        Model spec DataFrame.
+    extra_vars : dict
+        Extra variables for the flow.
     orig_col_name : str
-        The column from the choosers table that gives the origin zone index,
-        used to attach values from skims.
+        Name of the origin column.
     dest_col_name : str
-        The column from the choosers table that gives the destination zone index,
-        used to attach values from skims.
-    trace_label : str
-        A descriptive label
-    timeframe : {"tour", "timeless", "timeless_directional", "trip"}, default "tour"
-        A framework for how to treat the time and directionality of skims that
-        will be attached.
-    choosers : pandas.DataFrame
-        Attributes of the choosers, possibly interacted with attributes of the
-        alternatives.  Generally this flow can and will be re-used by swapping
-        out the `choosers` for a new dataframe with the same columns and
-        different rows.
-    stop_col_name : str
-        The column from the choosers table that gives the stop zone index in
-        trip destination choice, used to attach values from skims.
-    parking_col_name : str
-        The column from the choosers table that gives the parking zone index,
-        used to attach values from skims.
-    size_term_mapping : Mapping
-        Size term arrays.
-    interacts : pd.DataFrame, optional
-        An unmerged interaction dataset, giving attributes of the alternatives
-        that are not conditional on the chooser.  Use this when the choice model
-        has some variables that are conditional on the chooser (and included in
-        the `choosers` dataframe, and some variables that are conditional on the
-        alternative but not the chooser, and when every chooser has the same set
-        of possible alternatives.
-    zone_layer : {'taz', 'maz'}, default 'taz'
-        Specify which zone layer of the skims is to be used.  You cannot use the
-        'maz' zone layer in a one-zone model, but you can use the 'taz' layer in
-        a two- or three-zone model (e.g. for destination pre-sampling).
-    aux_vars : Mapping
-        Extra values that are available to expressions and which are written
-        only by reference into compiled code (and thus can be changed later).
+        Name of the destination column.
+    trace_label : str, optional
+        Label for tracing/logging.
+    timeframe : str, optional
+        Timeframe for the skims (default is 'tour').
+    choosers : pandas.DataFrame, optional
+        Chooser DataFrame.
+    stop_col_name : str, optional
+        Name of the stop column.
+    parking_col_name : str, optional
+        Name of the parking column.
+    size_term_mapping : dict, optional
+        Mapping for size terms.
+    interacts : pandas.DataFrame, optional
+        Interaction DataFrame.
+    zone_layer : str, optional
+        Zone layer for skims.
+    aux_vars : dict, optional
+        Auxiliary variables for the flow.
+    primary_origin_col_name : str, optional
+        Name of the primary origin column.
     compute_settings : ComputeSettings, optional
-        Settings for the sharrow flow.
+        Compute settings for sharrow.
 
     Returns
     -------
     sharrow.Flow
+        The created flow object.
     """
     if compute_settings is None:
         compute_settings = ComputeSettings()
@@ -719,15 +796,13 @@ def size_terms_on_flow(locals_d):
 
     Parameters
     ----------
-    locals_d : Mapping[str,Any]
-        The context for the flow.  If it does not contain "size_terms_array"
-        this function does nothing. Otherwise, the instructions for adding
-        the size terms to the DataTree are created in a "size_array" variable
-        in the same context space.
+    locals_d : dict
+        Context for the flow.
 
     Returns
     -------
-    locals_d
+    dict
+        Modified context with size terms if applicable.
     """
     if "size_terms_array" in locals_d:
         a = sh.Dataset(
@@ -767,44 +842,29 @@ def apply_flow(
 
     Parameters
     ----------
-    spec : pd.DataFrame
-    choosers : pd.DataFrame
-    locals_d : Mapping[str,Any], optional
-        A namespace of local variables to be made available with the
-        expressions in `spec`.
+    state : workflow.State
+        The workflow state object.
+    spec : pandas.DataFrame
+        Model spec DataFrame.
+    choosers : pandas.DataFrame
+        Chooser DataFrame.
+    locals_d : dict, optional
+        Local variables dictionary.
     trace_label : str, optional
-        A descriptive label used in logging and naming trace files.
-    required : bool, default False
-        Require the spec to be compile-able. If set to true, a problem will
-        the flow will be raised as an error, instead of allowing this function
-        to return with no result (and activitysim will then fall back to the
-        legacy eval system).
-    interacts : pd.DataFrame, optional
-        An unmerged interaction dataset, giving attributes of the alternatives
-        that are not conditional on the chooser.  Use this when the choice model
-        has some variables that are conditional on the chooser (and included in
-        the `choosers` dataframe, and some variables that are conditional on the
-        alternative but not the chooser, and when every chooser has the same set
-        of possible alternatives.
-    zone_layer : {'taz', 'maz'}, default 'taz'
-        Specify which zone layer of the skims is to be used.  You cannot use the
-        'maz' zone layer in a one-zone model, but you can use the 'taz' layer in
-        a two- or three-zone model (e.g. for destination pre-sampling).
+        Label for tracing/logging.
+    required : bool, optional
+        Require the spec to be compile-able (default is False).
+    interacts : pandas.DataFrame, optional
+        Interaction DataFrame.
+    zone_layer : str, optional
+        Zone layer for skims.
     compute_settings : ComputeSettings, optional
-        Settings for the sharrow flow, including for skipping and fastmath.
+        Compute settings for sharrow.
 
     Returns
     -------
-    flow_result : ndarray
-        The computed dot-product of the utility function and the coefficients.
-    flow : sharrow.Flow
-        The flow object itself.  In typical application you probably don't need
-        it ever again, but having a reference to it available later can be useful
-        in debugging and tracing.  Flows are cached and reused anyway, so it is
-        generally not important to delete this at any point to free resources.
-    tree : sharrow.DataTree
-        The tree data used to compute the flow result.  It is seperate from the
-        flow to prevent it from being cached with the flow.
+    tuple
+        (flow_result, flow, tree)
     """
     if sh is None:
         return None, None

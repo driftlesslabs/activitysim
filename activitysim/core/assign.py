@@ -16,6 +16,23 @@ logger = logging.getLogger(__name__)
 
 def uniquify_key(dict, key, template="{} ({})"):
     """
+    Rename key so there are no duplicates with keys in dict.
+
+    Parameters
+    ----------
+    dict : dict
+        Dictionary to check for duplicates.
+    key : str
+        Key to uniquify.
+    template : str, optional
+        Template for duplicate keys (default is '{} ({})').
+
+    Returns
+    -------
+    str
+        Unique key name.
+    """
+    """
     rename key so there are no duplicates with keys in dict
 
     e.g. if there is already a key named "dog", the second key will be reformatted to "dog (2)"
@@ -30,6 +47,21 @@ def uniquify_key(dict, key, template="{} ({})"):
 
 
 def evaluate_constants(expressions, constants):
+    """
+    Evaluate a list of constant expressions, each can depend on the one before it.
+
+    Parameters
+    ----------
+    expressions : pandas.Series
+        The index are the names of the expressions which are used in subsequent evals.
+    constants : dict
+        Passed as the scope of eval.
+
+    Returns
+    -------
+    dict
+        Dictionary of evaluated constants.
+    """
     """
     Evaluate a list of constant expressions - each one can depend on the one before
     it.  These are usually used for the coefficients which have relationships
@@ -68,6 +100,27 @@ def read_assignment_spec(
     target_name="Target",
     expression_name="Expression",
 ):
+    """
+    Read a CSV model specification into a Pandas DataFrame or Series.
+
+    The CSV is expected to have columns for component descriptions, targets, and expressions.
+
+    Parameters
+    ----------
+    file_name : path-like
+        Name of a CSV spec file.
+    description_name : str, optional
+        Name of the column in `fname` that contains the component description.
+    target_name : str, optional
+        Name of the column in `fname` that contains the component target.
+    expression_name : str, optional
+        Name of the column in `fname` that contains the component expression.
+
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame with three columns: ['description', 'target', 'expression']
+    """
     """
     Read a CSV model specification into a Pandas DataFrame or Series.
 
@@ -154,6 +207,15 @@ def read_assignment_spec(
 
 
 class NumpyLogger(object):
+    """
+    Logger for numpy warnings during expression evaluation.
+
+    Parameters
+    ----------
+    logger : logging.Logger
+        Logger to use for warnings.
+    """
+
     def __init__(self, logger):
         self.logger = logger
         self.target = ""
@@ -168,12 +230,17 @@ class NumpyLogger(object):
 
 def local_utilities(state):
     """
-    Dict of useful modules and functions to provides as locals for use in eval of expressions
+    Dict of useful modules and functions to provide as locals for use in eval of expressions.
+
+    Parameters
+    ----------
+    state : workflow.State
+        The workflow state object.
 
     Returns
     -------
-    utility_dict : dict
-        name, entity pairs of locals
+    dict
+        Name, entity pairs of locals.
     """
 
     utility_dict = {
@@ -192,14 +259,53 @@ def local_utilities(state):
 
 
 def is_throwaway(target):
+    """
+    Check if a target is a throwaway variable ("_").
+
+    Parameters
+    ----------
+    target : str
+        Target variable name.
+
+    Returns
+    -------
+    bool
+        True if throwaway, else False.
+    """
     return target == "_"
 
 
 def is_temp_scalar(target):
+    """
+    Check if a target is a temp scalar variable (starts with '_' and is uppercase).
+
+    Parameters
+    ----------
+    target : str
+        Target variable name.
+
+    Returns
+    -------
+    bool
+        True if temp scalar, else False.
+    """
     return target.startswith("_") and target.isupper()
 
 
 def is_temp(target):
+    """
+    Check if a target is a temp variable (starts with '_').
+
+    Parameters
+    ----------
+    target : str
+        Target variable name.
+
+    Returns
+    -------
+    bool
+        True if temp variable, else False.
+    """
     return target.startswith("_")
 
 
@@ -214,45 +320,35 @@ def assign_variables(
     chunk_log=None,
 ):
     """
-    Evaluate a set of variable expressions from a spec in the context
-    of a given data table.
-
-    Expressions are evaluated using Python's eval function.
-    Python expressions have access to variables in locals_d (and df being
-    accessible as variable df.) They also have access to previously assigned
-    targets as the assigned target name.
-
-    lowercase variables starting with underscore are temp variables (e.g. _local_var)
-    and not returned except in trace_results
-
-    uppercase variables starting with underscore are temp singular variables (e.g. _LOCAL_SCALAR)
-    and not returned except in trace_assigned_locals
-    This is useful for defining general purpose local variables that don't vary across
-    choosers or alternatives and therefore don't need to be stored as series/columns
-    in the main choosers dataframe from which utilities are computed.
-
-    Users should take care that expressions (other than temp scalar variables) should result in
-    a Pandas Series (scalars will be automatically promoted to series.)
+    Evaluate a set of variable expressions from a spec in the context of a given data table.
 
     Parameters
     ----------
-    assignment_expressions : pandas.DataFrame of target assignment expressions
-        target: target column names
-        expression: pandas or python expression to evaluate
+    state : workflow.State
+        The workflow state object.
+    assignment_expressions : pandas.DataFrame
+        DataFrame of target assignment expressions.
     df : pandas.DataFrame
-    locals_d : Dict
-        This is a dictionary of local variables that will be the environment
-        for an evaluation of "python" expression.
-    trace_rows: series or array of bools to use as mask to select target rows to trace
+        DataFrame providing the context for evaluation.
+    locals_dict : dict
+        Dictionary of local variables for the environment.
+    df_alias : str, optional
+        Alias for the DataFrame in the local environment.
+    trace_rows : array-like, optional
+        Mask to select target rows to trace.
+    trace_label : str, optional
+        Label for tracing/logging.
+    chunk_log : object, optional
+        Chunk log for logging.
 
     Returns
     -------
     variables : pandas.DataFrame
-        Will have the index of `df` and columns named by target and containing
-        the result of evaluating expression
+        DataFrame with the index of `df` and columns named by target.
     trace_results : pandas.DataFrame or None
-        a dataframe containing the eval result values for each assignment expression
+        DataFrame containing the eval result values for each assignment expression.
     trace_assigned_locals : dict or None
+        Dictionary of assigned local variables.
     """
 
     np_logger = NumpyLogger(logger)
