@@ -27,6 +27,25 @@ logger = logging.getLogger(__name__)
 
 
 def si_units(x, kind="B", digits=3, shift=1000):
+    """
+    Format a number with SI unit prefixes.
+
+    Parameters
+    ----------
+    x : float or int
+        The value to format.
+    kind : str, optional
+        The unit suffix (default is 'B').
+    digits : int, optional
+        Number of digits to round to (default is 3).
+    shift : int, optional
+        The base for SI units (default is 1000).
+
+    Returns
+    -------
+    str
+        The formatted string with SI prefix and unit.
+    """
     #       nano micro milli    kilo mega giga tera peta exa  zeta yotta
     tiers = ["n", "µ", "m", "", "K", "M", "G", "T", "P", "E", "Z", "Y"]
 
@@ -44,14 +63,53 @@ def si_units(x, kind="B", digits=3, shift=1000):
 
 
 def GB(bytes):
+    """
+    Format bytes as a string with SI units (gigabytes, etc).
+
+    Parameters
+    ----------
+    bytes : int
+        Number of bytes.
+
+    Returns
+    -------
+    str
+        Formatted string with SI prefix and 'B'.
+    """
     return si_units(bytes, kind="B", digits=1)
 
 
 def SEC(seconds):
+    """
+    Format seconds as a string with SI units.
+
+    Parameters
+    ----------
+    seconds : int or float
+        Number of seconds.
+
+    Returns
+    -------
+    str
+        Formatted string with SI prefix and 's'.
+    """
     return si_units(seconds, kind="s", digits=2)
 
 
 def INT(x):
+    """
+    Format an integer with underscores as thousands separators.
+
+    Parameters
+    ----------
+    x : int
+        Integer to format.
+
+    Returns
+    -------
+    str
+        Formatted string with underscores.
+    """
     # format int as camel case (e.g. 1000000 vecomes '1_000_000')
     negative = x < 0
     x = abs(int(x))
@@ -65,7 +123,16 @@ def INT(x):
 
 
 def delete_files(file_list, trace_label):
-    # delete files in file_list
+    """
+    Delete files in file_list.
+
+    Parameters
+    ----------
+    file_list : str or list of str
+        File(s) to delete.
+    trace_label : str
+        Label for logging.
+    """
 
     file_list = [file_list] if isinstance(file_list, str) else file_list
     for file_path in file_list:
@@ -80,25 +147,38 @@ def delete_files(file_list, trace_label):
 
 
 def df_size(df):
+    """
+    Return a string describing the shape and memory usage of a DataFrame.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        DataFrame to describe.
+
+    Returns
+    -------
+    str
+        String with shape and memory usage.
+    """
     bytes = 0 if df.empty else df.memory_usage(index=True).sum()
     return "%s %s" % (df.shape, GB(bytes))
 
 
 def iprod(ints):
     """
-    Return the product of hte ints in the list or tuple as an unlimited precision python int
+    Return the product of the ints in the list or tuple as an unlimited precision python int.
 
-    Specifically intended to compute arrray/buffer size for skims where np.proc might overflow for default dtypes.
-    (Narrowing rules for np.prod are different on Windows and linux)
-    an alternative to the unwieldy: int(np.prod(ints, dtype=np.int64))
+    Specifically intended to compute array/buffer size for skims where np.prod might overflow for default dtypes.
 
     Parameters
     ----------
-    ints: list or tuple of ints or int wannabees
+    ints : list or tuple of ints
+        Sequence of integers to multiply.
 
     Returns
     -------
-    returns python int
+    int
+        Product of the input integers.
     """
     assert len(ints) > 0
     return int(np.prod(ints, dtype=np.int64))
@@ -106,27 +186,23 @@ def iprod(ints):
 
 def left_merge_on_index_and_col(left_df, right_df, join_col, target_col):
     """
-    like pandas left merge, but join on both index and a specified join_col
-
-    FIXME - for now return a series of ov values from specified right_df target_col
+    Like pandas left merge, but join on both index and a specified join_col.
 
     Parameters
     ----------
-    left_df : pandas DataFrame
-        index name assumed to be same as that of right_df
-    right_df : pandas DataFrame
-        index name assumed to be same as that of left_df
+    left_df : pandas.DataFrame
+        Left DataFrame, index name assumed to be same as that of right_df.
+    right_df : pandas.DataFrame
+        Right DataFrame, index name assumed to be same as that of left_df.
     join_col : str
-        name of column to join on (in addition to index values)
-        should have same name in both dataframes
+        Name of column to join on (in addition to index values).
     target_col : str
-        name of column from right_df whose joined values should be returned as series
+        Name of column from right_df whose joined values should be returned as series.
 
     Returns
     -------
-    target_series : pandas Series
-        series of target_col values with same index as left_df
-        i.e. values joined to left_df from right_df with index of left_df
+    pandas.Series
+        Series of target_col values with same index as left_df.
     """
     assert left_df.index.name == right_df.index.name
 
@@ -148,37 +224,19 @@ def left_merge_on_index_and_col(left_df, right_df, join_col, target_col):
 
 def reindex(series1, series2):
     """
-    This reindexes the first series by the second series.  This is an extremely
-    common operation that does not appear to  be in Pandas at this time.
-    If anyone knows of an easier way to do this in Pandas, please inform the
-    UrbanSim developers.
-
-    The canonical example would be a parcel series which has an index which is
-    parcel_ids and a value which you want to fetch, let's say it's land_area.
-    Another dataset, let's say of buildings has a series which indicate the
-    parcel_ids that the buildings are located on, but which does not have
-    land_area.  If you pass parcels.land_area as the first series and
-    buildings.parcel_id as the second series, this function returns a series
-    which is indexed by buildings and has land_area as values and can be
-    added to the buildings dataset.
-
-    In short, this is a join on to a different table using a foreign key
-    stored in the current table, but with only one attribute rather than
-    for a full dataset.
-
-    This is very similar to the pandas "loc" function or "reindex" function,
-    but neither of those functions return the series indexed on the current
-    table.  In both of those cases, the series would be indexed on the foreign
-    table and would require a second step to change the index.
+    Reindex the first series by the second series.
 
     Parameters
     ----------
-    series1, series2 : pandas.Series
+    series1 : pandas.Series
+        Series to reindex from.
+    series2 : pandas.Series
+        Series whose values are used as the new index.
 
     Returns
     -------
-    reindexed : pandas.Series
-
+    pandas.Series
+        Reindexed series.
     """
 
     result = series1.reindex(series2)
@@ -193,30 +251,37 @@ def reindex(series1, series2):
 
 def reindex_i(series1, series2, dtype=np.int8):
     """
-    version of reindex that replaces missing na values and converts to int
-    helpful in expression files that compute counts (e.g. num_work_tours)
+    Version of reindex that replaces missing na values and converts to int.
+
+    Parameters
+    ----------
+    series1 : pandas.Series
+    series2 : pandas.Series
+    dtype : type, optional
+        Data type to cast to (default is np.int8).
+
+    Returns
+    -------
+    pandas.Series
+        Reindexed and type-cast series.
     """
     return reindex(series1, series2).fillna(0).astype(dtype)
 
 
 def other_than(groups, bools):
     """
-    Construct a Series that has booleans indicating the presence of
-    something- or someone-else with a certain property within a group.
+    Construct a Series that has booleans indicating the presence of something- or someone-else with a certain property within a group.
 
     Parameters
     ----------
     groups : pandas.Series
-        A column with the same index as `bools` that defines the grouping
-        of `bools`. The `bools` Series will be used to index `groups` and
-        then the grouped values will be counted.
+        A column with the same index as `bools` that defines the grouping of `bools`.
     bools : pandas.Series
         A boolean Series indicating where the property of interest is present.
-        Should have the same index as `groups`.
 
     Returns
     -------
-    others : pandas.Series
+    pandas.Series
         A boolean Series with the same index as `groups` and `bools`
         indicating whether there is something- or something-else within
         a group with some property (as indicated by `bools`).
@@ -244,19 +309,21 @@ def other_than(groups, bools):
 
 def quick_loc_df(loc_list, target_df, attribute=None):
     """
-    faster replacement for target_df.loc[loc_list] or target_df.loc[loc_list][attribute]
-
-    pandas DataFrame.loc[] indexing doesn't scale for large arrays (e.g. > 1,000,000 elements)
+    Faster replacement for target_df.loc[loc_list] or target_df.loc[loc_list][attribute].
 
     Parameters
     ----------
-    loc_list : list-like (numpy.ndarray, pandas.Int64Index, or pandas.Series)
-    target_df : pandas.DataFrame containing column named attribute
-    attribute : name of column from loc_list to return (or none for all columns)
+    loc_list : list-like
+        List of locations to select.
+    target_df : pandas.DataFrame
+        DataFrame to select from.
+    attribute : str, optional
+        Name of column to return (or None for all columns).
 
     Returns
     -------
-        pandas.DataFrame or, if attribbute specified, pandas.Series
+    pandas.DataFrame or pandas.Series
+        Selected rows or column.
     """
     if attribute:
         target_df = target_df[[attribute]]
@@ -275,18 +342,19 @@ def quick_loc_df(loc_list, target_df, attribute=None):
 
 def quick_loc_series(loc_list, target_series):
     """
-    faster replacement for target_series.loc[loc_list]
-
-    pandas Series.loc[] indexing doesn't scale for large arrays (e.g. > 1,000,000 elements)
+    Faster replacement for target_series.loc[loc_list].
 
     Parameters
     ----------
-    loc_list : list-like (numpy.ndarray, pandas.Int64Index, or pandas.Series)
+    loc_list : list-like
+        List of locations to select.
     target_series : pandas.Series
+        Series to select from.
 
     Returns
     -------
-        pandas.Series
+    pandas.Series
+        Selected values.
     """
 
     left_on = "left"
@@ -318,23 +386,19 @@ def quick_loc_series(loc_list, target_series):
 
 def assign_in_place(df, df2, downcast_int=False, downcast_float=False):
     """
-    update existing row values in df from df2, adding columns to df if they are not there
+    Update existing row values in df from df2, adding columns to df if they are not there.
 
     Parameters
     ----------
-    df : pd.DataFrame
-        assignment left-hand-side (dest)
-    df2: pd.DataFrame
-        assignment right-hand-side (source)
-    downcast_int: bool
-        if True, downcast int columns if possible
-    downcast_float: bool
-        if True, downcast float columns if possible
-    Returns
-    -------
-
+    df : pandas.DataFrame
+        Assignment left-hand-side (dest).
+    df2 : pandas.DataFrame
+        Assignment right-hand-side (source).
+    downcast_int : bool, optional
+        If True, downcast int columns if possible.
+    downcast_float : bool, optional
+        If True, downcast float columns if possible.
     """
-
     # expect no rows in df2 that are not in df
     assert len(df2.index.difference(df.index)) == 0
 
@@ -391,24 +455,23 @@ def auto_opt_pd_dtypes(
     df_: pd.DataFrame, downcast_int=False, downcast_float=False, inplace=False
 ) -> Optional[pd.DataFrame]:
     """
-    Automatically downcast Number dtypes for minimal possible,
-    will not touch other (datetime, str, object, etc)
+    Automatically downcast Number dtypes for minimal possible, will not touch other (datetime, str, object, etc).
 
     Parameters
     ----------
-    df_ : pd.DataFrame
-        assignment left-hand-side (dest)
-    downcast_int: bool
-        if True, downcast int columns if possible
-    downcast_float: bool
-        if True, downcast float columns if possible
-    inplace: bool
-        if False, will return a copy of input dataset
+    df_ : pandas.DataFrame
+        DataFrame to optimize.
+    downcast_int : bool, optional
+        If True, downcast int columns if possible.
+    downcast_float : bool, optional
+        If True, downcast float columns if possible.
+    inplace : bool, optional
+        If False, will return a copy of input dataset.
 
     Returns
     -------
-        `None` if `inplace=True` or dataframe if `inplace=False`
-
+    pandas.DataFrame or None
+        Optimized DataFrame if inplace is False, otherwise None.
     """
     df = df_ if inplace else df_.copy()
 
@@ -453,6 +516,21 @@ def auto_opt_pd_dtypes(
 
 
 def reindex_if_series(values, index):
+    """
+    Reindex a Series if index is not None and values is a Series.
+
+    Parameters
+    ----------
+    values : pandas.Series or other
+        Values to reindex if necessary.
+    index : pandas.Index or None
+        Index to reindex to.
+
+    Returns
+    -------
+    pandas.Series or other
+        Reindexed values or original values.
+    """
     if index is not None:
         return values
 
@@ -464,6 +542,21 @@ def reindex_if_series(values, index):
 
 
 def df_from_dict(values, index=None):
+    """
+    Create a DataFrame from a dictionary of values, reindexing Series if needed.
+
+    Parameters
+    ----------
+    values : dict
+        Dictionary of column names to values.
+    index : pandas.Index, optional
+        Index to use for the DataFrame.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Constructed DataFrame.
+    """
     # If value object is a series and has out of order index, reindex it
     values = {k: reindex_if_series(v, index) for k, v in values.items()}
 
@@ -486,6 +579,23 @@ def df_from_dict(values, index=None):
 def ordered_load(
     stream, Loader=yaml.SafeLoader, object_pairs_hook=collections.OrderedDict
 ):
+    """
+    Load YAML with ordered mapping.
+
+    Parameters
+    ----------
+    stream : file-like
+        YAML stream to load.
+    Loader : yaml.Loader, optional
+        YAML loader class.
+    object_pairs_hook : callable, optional
+        Callable for ordered mapping.
+
+    Returns
+    -------
+    object
+        Loaded YAML object.
+    """
     class OrderedLoader(Loader):
         pass
 
@@ -500,6 +610,19 @@ def ordered_load(
 
 
 def named_product(**d):
+    """
+    Cartesian product of named arguments, yielding dicts.
+
+    Parameters
+    ----------
+    **d : dict
+        Named arguments with iterable values.
+
+    Yields
+    ------
+    dict
+        Dictionary for each combination.
+    """
     names = d.keys()
     vals = d.values()
     for res in itertools.product(*vals):
@@ -507,6 +630,23 @@ def named_product(**d):
 
 
 def recursive_replace(obj, search, replace):
+    """
+    Recursively replace values in a nested structure.
+
+    Parameters
+    ----------
+    obj : object
+        Object to search.
+    search : object
+        Value to search for.
+    replace : object
+        Value to replace with.
+
+    Returns
+    -------
+    object
+        Modified object.
+    """
     if isinstance(obj, dict):
         for k, v in obj.items():
             obj[k] = recursive_replace(v, search, replace)
@@ -525,6 +665,23 @@ def suffix_tables_in_settings(
     suffix: str = "proto_",
     tables: Iterable[str] = ("persons", "households", "tours", "persons_merged"),
 ) -> T:
+    """
+    Add a suffix to table names in model settings.
+
+    Parameters
+    ----------
+    model_settings : dict or PydanticBase
+        Model settings to modify.
+    suffix : str, optional
+        Suffix to add (default is 'proto_').
+    tables : iterable of str, optional
+        Table names to replace.
+
+    Returns
+    -------
+    Same type as model_settings
+        Modified model settings.
+    """
     if not isinstance(model_settings, dict):
         model_settings_type = type(model_settings)
         model_settings = model_settings.dict()
@@ -543,12 +700,42 @@ def suffix_tables_in_settings(
 def suffix_expressions_df_str(
     df, suffix="proto_", tables=["persons", "households", "tours", "persons_merged"]
 ):
+    """
+    Add a suffix to table names in the 'expression' column of a DataFrame.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        DataFrame with an 'expression' column.
+    suffix : str, optional
+        Suffix to add (default is 'proto_').
+    tables : list of str, optional
+        Table names to replace.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Modified DataFrame.
+    """
     for k in tables:
         df["expression"] = df.expression.str.replace(k, suffix + k)
     return df
 
 
 def parse_suffix_args(args):
+    """
+    Parse command-line arguments for suffixing tables.
+
+    Parameters
+    ----------
+    args : str
+        Argument string to parse.
+
+    Returns
+    -------
+    argparse.Namespace
+        Parsed arguments.
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument("filename", help="file name")
     parser.add_argument("-s", "--SUFFIX", "-s", help="suffix to replace root targets")
@@ -559,6 +746,19 @@ def parse_suffix_args(args):
 
 
 def concat_suffix_dict(args):
+    """
+    Convert a dict or BaseModel to a flat list of command-line arguments.
+
+    Parameters
+    ----------
+    args : dict, BaseModel, or list
+        Arguments to convert.
+
+    Returns
+    -------
+    list
+        List of command-line arguments.
+    """
     if isinstance(args, BaseModel):
         args = args.dict()
         if "source_file_paths" in args:
@@ -571,6 +771,19 @@ def concat_suffix_dict(args):
 
 
 def flatten(lst):
+    """
+    Flatten a nested list.
+
+    Parameters
+    ----------
+    lst : list
+        List to flatten.
+
+    Yields
+    ------
+    object
+        Flattened items.
+    """
     for sublist in lst:
         if isinstance(sublist, list):
             for item in sublist:
@@ -580,6 +793,21 @@ def flatten(lst):
 
 
 def nearest_node_index(node, nodes):
+    """
+    Find the index of the node in 'nodes' closest to 'node'.
+
+    Parameters
+    ----------
+    node : array-like
+        Target node.
+    nodes : array-like
+        Array of nodes to search.
+
+    Returns
+    -------
+    int
+        Index of the nearest node.
+    """
     nodes = np.asarray(nodes)
     deltas = nodes - node
     dist_2 = np.einsum("ij,ij->i", deltas, deltas)
@@ -587,12 +815,35 @@ def nearest_node_index(node, nodes):
 
 
 def read_csv(filename):
-    """Simple read of a CSV file, much faster than pandas.read_csv"""
+    """
+    Simple read of a CSV file, much faster than pandas.read_csv.
+
+    Parameters
+    ----------
+    filename : str or Path
+        Path to the CSV file.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Loaded DataFrame.
+    """
     return csv.read_csv(filename).to_pandas()
 
 
 def to_csv(df, filename, index=False):
-    """Simple write of a CSV file, much faster than pandas.DataFrame.to_csv"""
+    """
+    Simple write of a CSV file, much faster than pandas.DataFrame.to_csv.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        DataFrame to write.
+    filename : str or Path
+        Path to the output CSV file.
+    index : bool, optional
+        Whether to write the index (default is False).
+    """
     filename = Path(filename)
     if filename.suffix == ".gz":
         with pa.CompressedOutputStream(filename, "gzip") as out:
@@ -602,27 +853,87 @@ def to_csv(df, filename, index=False):
 
 
 def read_parquet(filename):
-    """Simple read of a parquet file"""
+    """
+    Simple read of a parquet file.
+
+    Parameters
+    ----------
+    filename : str or Path
+        Path to the parquet file.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Loaded DataFrame.
+    """
     return pq.read_table(filename).to_pandas()
 
 
 def to_parquet(df, filename, index=False):
+    """
+    Write a DataFrame to a parquet file.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        DataFrame to write.
+    filename : str or Path
+        Path to the output parquet file.
+    index : bool, optional
+        Whether to write the index (default is False).
+    """
     filename = Path(filename)
     pq.write_table(pa.Table.from_pandas(df, preserve_index=index), filename)
 
 
 def latest_file_modification_time(filenames: Iterable[Path]):
-    """Find the most recent file modification time."""
+    """
+    Find the most recent file modification time.
+
+    Parameters
+    ----------
+    filenames : iterable of Path
+        Files to check.
+
+    Returns
+    -------
+    float
+        Most recent modification time (timestamp).
+    """
     return max(os.path.getmtime(filename) for filename in filenames)
 
 
 def oldest_file_modification_time(filenames: Iterable[Path]):
-    """Find the least recent file modification time."""
+    """
+    Find the least recent file modification time.
+
+    Parameters
+    ----------
+    filenames : iterable of Path
+        Files to check.
+
+    Returns
+    -------
+    float
+        Oldest modification time (timestamp).
+    """
     return min(os.path.getmtime(filename) for filename in filenames)
 
 
 def zarr_file_modification_time(zarr_dir: Path):
-    """Find the most recent file modification time inside a zarr dir."""
+    """
+    Find the most recent file modification time inside a zarr dir.
+
+    Parameters
+    ----------
+    zarr_dir : Path
+        Directory to search.
+
+    Returns
+    -------
+    float
+        Most recent modification time (timestamp).
+    """
     t = 0
     for dirpath, dirnames, filenames in os.walk(zarr_dir):
         if os.path.basename(dirpath).startswith(".git"):
@@ -652,6 +963,26 @@ def drop_unused_columns(
 ):
     """
     Drop unused columns from the chooser table, based on the spec and custom_chooser function.
+
+    Parameters
+    ----------
+    choosers : pandas.DataFrame
+        Chooser table.
+    spec : pandas.DataFrame
+        Model spec DataFrame.
+    locals_d : dict
+        Local variables dictionary.
+    custom_chooser : function
+        Custom chooser function.
+    sharrow_enabled : bool, optional
+        Whether sharrow is enabled (default is False).
+    additional_columns : list, optional
+        Additional columns to keep.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Chooser table with unused columns dropped.
     """
     # keep only variables needed for spec
     import re

@@ -49,6 +49,23 @@ CustomChooser_T = Callable[
 
 
 def random_rows(state: workflow.State, df, n):
+    """
+    Randomly sample up to n rows from a DataFrame.
+
+    Parameters
+    ----------
+    state : workflow.State
+        The workflow state object containing the random number generator.
+    df : pandas.DataFrame
+        The DataFrame to sample from.
+    n : int
+        The number of rows to sample.
+
+    Returns
+    -------
+    pandas.DataFrame
+        A DataFrame with up to n randomly sampled rows.
+    """
     # only sample if df has more than n rows
     if len(df.index) > n:
         prng = state.get_rn_generator().get_global_rng()
@@ -59,6 +76,14 @@ def random_rows(state: workflow.State, df, n):
 
 
 def uniquify_spec_index(spec: pd.DataFrame):
+    """
+    Ensure uniqueness of the spec DataFrame index by appending a comment with a duplicate count.
+
+    Parameters
+    ----------
+    spec : pandas.DataFrame
+        The DataFrame whose index will be made unique in-place.
+    """
     # uniquify spec index inplace
     # ensure uniqueness of spec index by appending comment with dupe count
     # this allows us to use pandas dot to compute_utilities
@@ -74,6 +99,23 @@ def uniquify_spec_index(spec: pd.DataFrame):
 
 
 def read_model_alts(state: workflow.State, file_name, set_index=None):
+    """
+    Read a CSV file of model alternatives into a DataFrame.
+
+    Parameters
+    ----------
+    state : workflow.State
+        The workflow state object.
+    file_name : str
+        The name of the alternatives file.
+    set_index : str or None
+        Column to set as index, if provided.
+
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame of alternatives.
+    """
     file_path = state.filesystem.get_config_file_path(file_name)
     df = pd.read_csv(file_path, comment="#")
     if set_index:
@@ -85,30 +127,16 @@ def read_model_spec(filesystem: configuration.FileSystem, file_name: Path | str)
     """
     Read a CSV model specification into a Pandas DataFrame or Series.
 
-    file_path : str   absolute or relative path to file
-
-    The CSV is expected to have columns for component descriptions
-    and expressions, plus one or more alternatives.
-
-    The CSV is required to have a header with column names. For example:
-
-        Description,Expression,alt0,alt1,alt2
-
     Parameters
     ----------
-    model_settings : dict
-        name of spec_file is in model_settings['SPEC'] and file is relative to configs
-    file_name : str
-        file_name id spec file in configs folder
-
-    description_name : str, optional
-        Name of the column in `fname` that contains the component description.
-    expression_name : str, optional
-        Name of the column in `fname` that contains the component expression.
+    filesystem : configuration.FileSystem
+        The configuration filesystem object.
+    file_name : Path or str
+        The name or path of the spec file.
 
     Returns
     -------
-    spec : pandas.DataFrame
+    pandas.DataFrame
         The description column is dropped from the returned data and the
         expression values are set as the table index.
     """
@@ -152,7 +180,21 @@ def read_model_coefficients(
     file_name: Path | str | None = None,
 ) -> pd.DataFrame:
     """
-    Read the coefficient file specified by COEFFICIENTS model setting
+    Read the coefficient file specified by COEFFICIENTS model setting.
+
+    Parameters
+    ----------
+    filesystem : configuration.FileSystem
+        The configuration filesystem object.
+    model_settings : BaseLogitComponentSettings or dict or None
+        Model settings containing the COEFFICIENTS key.
+    file_name : Path or str or None
+        The name or path of the coefficients file.
+
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame of coefficients indexed by coefficient_name.
     """
     assert isinstance(filesystem, configuration.FileSystem)
 
@@ -208,19 +250,29 @@ def spec_for_segment(
     coefficients_file_name: Path | None = None,
 ) -> pd.DataFrame:
     """
-    Select spec for specified segment from omnibus spec containing columns for each segment
+    Select spec for specified segment from omnibus spec containing columns for each segment.
 
     Parameters
     ----------
-    model_spec : pandas.DataFrame
-        omnibus spec file with expressions in index and one column per segment
+    state : workflow.State
+        The workflow state object.
+    model_settings : dict or None
+        Model settings dictionary.
+    spec_id : str
+        Key for the spec file in model_settings.
     segment_name : str
-        segment_name that is also column name in model_spec
+        Segment name that is also a column name in the spec.
+    estimator : Estimator or None
+        Estimator object for estimation mode.
+    spec_file_name : Path or None
+        Optional path to the spec file.
+    coefficients_file_name : Path or None
+        Optional path to the coefficients file.
 
     Returns
     -------
-    pandas.dataframe
-        canonical spec file with expressions in index and single column with utility coefficients
+    pandas.DataFrame
+        Canonical spec file with expressions in index and a single column with utility coefficients.
     """
 
     if spec_file_name is None:
@@ -270,7 +322,19 @@ def read_model_coefficient_template(
     model_settings: dict | TemplatedLogitComponentSettings,
 ):
     """
-    Read the coefficient template specified by COEFFICIENT_TEMPLATE model setting
+    Read the coefficient template specified by COEFFICIENT_TEMPLATE model setting.
+
+    Parameters
+    ----------
+    filesystem : configuration.FileSystem
+        The configuration filesystem object.
+    model_settings : dict or TemplatedLogitComponentSettings
+        Model settings containing the COEFFICIENT_TEMPLATE key.
+
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame of the coefficient template indexed by coefficient_name.
     """
 
     if isinstance(model_settings, dict):
@@ -312,7 +376,14 @@ def read_model_coefficient_template(
 
 def dump_mapped_coefficients(state: workflow.State, model_settings):
     """
-    dump template_df with coefficient values
+    Dump the coefficient template DataFrame with mapped coefficient values to CSV files.
+
+    Parameters
+    ----------
+    state : workflow.State
+        The workflow state object.
+    model_settings : dict
+        Model settings containing COEFFICIENTS and COEFFICIENT_TEMPLATE keys.
     """
 
     coefficients_df = state.filesystem.read_model_coefficients(model_settings)
@@ -338,34 +409,21 @@ def get_segment_coefficients(
     segment_name: str,
 ):
     """
-    Return a dict mapping generic coefficient names to segment-specific coefficient values
+    Return a dict mapping generic coefficient names to segment-specific coefficient values.
 
-    some specs mode_choice logsums have the same espression values with different coefficients for various segments
-    (e.g. eatout, .. ,atwork) and a template file that maps a flat list of coefficients into segment columns.
+    Parameters
+    ----------
+    filesystem : configuration.FileSystem
+        The configuration filesystem object.
+    model_settings : PydanticBase or dict
+        Model settings containing COEFFICIENTS and COEFFICIENT_TEMPLATE keys.
+    segment_name : str
+        The segment name for which to retrieve coefficients.
 
-    This allows us to provide a coefficient file with just the coefficients for a specific segment,
-    that works with generic coefficient names in the spec. For instance coef_ivt can take on the values
-    of segment-specific coefficients coef_ivt_school_univ, coef_ivt_work, coef_ivt_atwork,...
-
-    ::
-
-        coefficients_df
-                                      value constrain
-        coefficient_name
-        coef_ivt_eatout_escort_...  -0.0175         F
-        coef_ivt_school_univ        -0.0224         F
-        coef_ivt_work               -0.0134         F
-        coef_ivt_atwork             -0.0188         F
-
-        template_df
-
-        coefficient_name     eatout                       school                 school                 work
-        coef_ivt             coef_ivt_eatout_escort_...   coef_ivt_school_univ   coef_ivt_school_univ   coef_ivt_work
-
-        For school segment this will return the generic coefficient name with the segment-specific coefficient value
-        e.g. {'coef_ivt': -0.0224, ...}
-        ...
-
+    Returns
+    -------
+    dict
+        Dictionary mapping generic coefficient names to segment-specific values.
     """
     if isinstance(model_settings, PydanticBase):
         model_settings = model_settings.dict()
@@ -438,6 +496,23 @@ def get_segment_coefficients(
 def eval_nest_coefficients(
     nest_spec: LogitNestSpec | dict, coefficients: dict, trace_label: str
 ) -> LogitNestSpec:
+    """
+    Replace coefficient names in a nest specification with their values from a coefficients dictionary.
+
+    Parameters
+    ----------
+    nest_spec : LogitNestSpec or dict
+        Nest specification tree.
+    coefficients : dict
+        Dictionary of coefficient values.
+    trace_label : str
+        Label for tracing/logging.
+
+    Returns
+    -------
+    LogitNestSpec
+        Nest specification with coefficients replaced by values.
+    """
     def replace_coefficients(nest: LogitNestSpec):
         if isinstance(nest, dict):
             assert "coefficient" in nest
@@ -483,6 +558,25 @@ def eval_coefficients(
     coefficients: dict | pd.DataFrame,
     estimator: Estimator | None,
 ) -> pd.DataFrame:
+    """
+    Evaluate and apply coefficients to a spec DataFrame.
+
+    Parameters
+    ----------
+    state : workflow.State
+        The workflow state object.
+    spec : pandas.DataFrame
+        The spec DataFrame with expressions and coefficients.
+    coefficients : dict or pandas.DataFrame
+        Coefficient values to apply.
+    estimator : Estimator or None
+        Estimator object for estimation mode.
+
+    Returns
+    -------
+    pandas.DataFrame
+        The spec DataFrame with coefficients evaluated and applied.
+    """
     spec = spec.copy()  # don't clobber input spec
 
     if isinstance(coefficients, pd.DataFrame):
@@ -540,45 +634,41 @@ def eval_utilities(
 
     Parameters
     ----------
+    state : workflow.State
+        The workflow state object.
     spec : pandas.DataFrame
         A table of variable specifications and coefficient values.
         Variable expressions should be in the table index and the table
         should have a column for each alternative.
     choosers : pandas.DataFrame
-    locals_d : Dict or None
-        This is a dictionary of local variables that will be the environment
-        for an evaluation of an expression that begins with "@".
-    trace_label : str
+        DataFrame of choosers.
+    locals_d : dict or None
+        Dictionary of local variables for expression evaluation.
+    trace_label : str or None
+        Label for tracing/logging.
     have_trace_targets : bool
-        Indicates if `choosers` has targets to trace
+        Indicates if `choosers` has targets to trace.
     trace_all_rows : bool
-        Trace all chooser rows, bypassing tracing.trace_targets
-    estimator :
-        called to report intermediate table results (used for estimation)
-    trace_column_names: str or list[str]
-        chooser columns to include when tracing expression_values
-    log_alt_losers : bool, default False
+        Trace all chooser rows, bypassing tracing.trace_targets.
+    estimator : Estimator or None
+        Estimator object for estimation mode.
+    trace_column_names : str or list of str or None
+        Chooser columns to include when tracing expression_values.
+    log_alt_losers : bool
         Write out expressions when all alternatives are unavailable.
-        This can be useful for model development to catch errors in
-        specifications. Enabling this check does not alter valid results
-        but slows down model runs.
-    zone_layer : {'taz', 'maz'}, optional
-        Specify which zone layer of the skims is to be used by sharrow.  You
-        cannot use the 'maz' zone layer in a one-zone model, but you can use
-        the 'taz' layer in a two- or three-zone model (e.g. for destination
-        pre-sampling). If not given, the default (lowest available) layer is
-        used.
-    spec_sh : pandas.DataFrame, optional
-        An alternative `spec` modified specifically for use with sharrow.
-        This is meant to give the same result, but allows for some optimizations
-        or preprocessing outside the sharrow framework (e.g. to run the Python
-        based transit virtual path builder and cache relevant values).
-    compute_settings : ComputeSettings, optional
+    zone_layer : str or None
+        Specify which zone layer of the skims is to be used by sharrow.
+    spec_sh : pandas.DataFrame or None
+        Alternative spec for use with sharrow.
+    chunk_sizer : ChunkSizer
+        ChunkSizer object for logging.
+    compute_settings : ComputeSettings or None
         Settings for sharrow. If not given, the default settings are used.
 
     Returns
     -------
-    utilities : pandas.DataFrame
+    pandas.DataFrame
+        DataFrame of computed utilities for each chooser and alternative.
     """
     start_time = time.time()
 
@@ -852,33 +942,21 @@ def eval_variables(state: workflow.State, exprs, df, locals_d=None):
     Evaluate a set of variable expressions from a spec in the context
     of a given data table.
 
-    There are two kinds of supported expressions: "simple" expressions are
-    evaluated in the context of the DataFrame using DataFrame.eval.
-    This is the default type of expression.
-
-    Python expressions are evaluated in the context of this function using
-    Python's eval function. Because we use Python's eval this type of
-    expression supports more complex operations than a simple expression.
-    Python expressions are denoted by beginning with the @ character.
-    Users should take care that these expressions must result in
-    a Pandas Series.
-
-    # FIXME - for performance, it is essential that spec and expression_values
-    # FIXME - not contain booleans when dotted with spec values
-    # FIXME - or the arrays will be converted to dtype=object within dot()
-
     Parameters
     ----------
+    state : workflow.State
+        The workflow state object.
     exprs : sequence of str
+        Expressions to evaluate.
     df : pandas.DataFrame
-    locals_d : Dict
-        This is a dictionary of local variables that will be the environment
-        for an evaluation of an expression that begins with @
+        DataFrame providing the context for evaluation.
+    locals_d : dict or None
+        Dictionary of local variables for expression evaluation.
 
     Returns
     -------
-    variables : pandas.DataFrame
-        Will have the index of `df` and columns of eval results of `exprs`.
+    pandas.DataFrame
+        DataFrame with the index of `df` and columns of eval results of `exprs`.
     """
 
     # avoid altering caller's passed-in locals_d parameter (they may be looping)
@@ -930,31 +1008,6 @@ def eval_variables(state: workflow.State, exprs, df, locals_d=None):
     return values
 
 
-# no longer used because eval_utilities aggregates expression_values as they are computed to save space
-# def compute_utilities(expression_values, spec):
-#
-#     # matrix product of spec expression_values with utility coefficients of alternatives
-#     # sums the partial utilities (represented by each spec row) of the alternatives
-#     # resulting in a dataframe with one row per chooser and one column per alternative
-#     # pandas.dot depends on column names of expression_values matching spec index values
-#
-#     # FIXME - for performance, it is essential that spec and expression_values
-#     # FIXME - not contain booleans when dotted with spec values
-#     # FIXME - or the arrays will be converted to dtype=object within dot()
-#
-#     spec = spec.astype(np.float64)
-#
-#     # pandas.dot depends on column names of expression_values matching spec index values
-#     # expressions should have been uniquified when spec was read
-#     # we could do it here if need be, and then set spec.index and expression_values.columns equal
-#     assert spec.index.is_unique
-#     assert (spec.index.values == expression_values.columns.values).all()
-#
-#     utilities = expression_values.dot(spec)
-#
-#     return utilities
-
-
 def set_skim_wrapper_targets(df, skims):
     """
     Add the dataframe to the SkimWrapper object so that it can be dereferenced
@@ -963,16 +1016,10 @@ def set_skim_wrapper_targets(df, skims):
     Parameters
     ----------
     df : pandas.DataFrame
-        Table to which to add skim data as new columns.
-        `df` is modified in-place.
+        Table to which to add skim data as new columns. `df` is modified in-place.
     skims : SkimWrapper or Skim3dWrapper object, or a list or dict of skims
         The skims object is used to contain multiple matrices of
-        origin-destination impedances.  Make sure to also add it to the
-        locals_d below in order to access it in expressions.  The *only* job
-        of this method in regards to skims is to call set_df with the
-        dataframe that comes back from interacting choosers with
-        alternatives.  See the skims module for more documentation on how
-        the skims object is intended to be used.
+        origin-destination impedances.
     """
 
     skims = (
@@ -991,70 +1038,23 @@ def set_skim_wrapper_targets(df, skims):
             pass
 
 
-#
-# def _check_for_variability(expression_values, trace_label):
-#     """
-#     This is an internal method which checks for variability in each
-#     expression - under the assumption that you probably wouldn't be using a
-#     variable (in live simulations) if it had no variability.  This is a
-#     warning to the user that they might have constructed the variable
-#     incorrectly.  It samples 1000 rows in order to not hurt performance -
-#     it's likely that if 1000 rows have no variability, the whole dataframe
-#     will have no variability.
-#     """
-#
-#     if trace_label is None:
-#         trace_label = "_check_for_variability"
-#
-#     sample = random_rows(expression_values, min(1000, len(expression_values)))
-#
-#     no_variability = has_missing_vals = 0
-#     for i in range(len(sample.columns)):
-#         v = sample.iloc[:, i]
-#         if v.min() == v.max():
-#             col_name = sample.columns[i]
-#             logger.info(
-#                 "%s: no variability (%s) in: %s" % (trace_label, v.iloc[0], col_name)
-#             )
-#             no_variability += 1
-#         # FIXME - how could this happen? Not sure it is really a problem?
-#         if np.count_nonzero(v.isnull().values) > 0:
-#             col_name = sample.columns[i]
-#             logger.info("%s: missing values in: %s" % (trace_label, col_name))
-#             has_missing_vals += 1
-#
-#     if no_variability > 0:
-#         logger.warning(
-#             "%s: %s columns have no variability" % (trace_label, no_variability)
-#         )
-#
-#     if has_missing_vals > 0:
-#         logger.warning(
-#             "%s: %s columns have missing values" % (trace_label, has_missing_vals)
-#         )
-
-
 def compute_nested_exp_utilities(raw_utilities, nest_spec):
     """
-    compute exponentiated nest utilities based on nesting coefficients
+    Compute exponentiated nest utilities based on nesting coefficients.
 
-    For nest nodes this is the exponentiated logsum of alternatives adjusted by nesting coefficient
-
-    leaf <- exp( raw_utility )
-    nest <- exp( ln(sum of exponentiated raw_utility of leaves) * nest_coefficient)
+    For nest nodes this is the exponentiated logsum of alternatives adjusted by nesting coefficient.
 
     Parameters
     ----------
     raw_utilities : pandas.DataFrame
-        dataframe with the raw alternative utilities of all leaves
-        (what in non-nested logit would be the utilities of all the alternatives)
+        DataFrame with the raw alternative utilities of all leaves.
     nest_spec : dict
-        Nest tree dict from the model spec yaml file
+        Nest tree dict from the model spec yaml file.
 
     Returns
     -------
-    nested_utilities : pandas.DataFrame
-        Will have the index of `raw_utilities` and columns for exponentiated leaf and node utilities
+    pandas.DataFrame
+        DataFrame with the index of `raw_utilities` and columns for exponentiated leaf and node utilities.
     """
     nested_utilities = pd.DataFrame(index=raw_utilities.index)
 
@@ -1088,22 +1088,23 @@ def compute_nested_probabilities(
     state: workflow.State, nested_exp_utilities, nest_spec, trace_label
 ):
     """
-    compute nested probabilities for nest leafs and nodes
-    probability for nest alternatives is simply the alternatives's local (to nest) probability
-    computed in the same way as the probability of non-nested alternatives in multinomial logit
-    i.e. the fractional share of the sum of the exponentiated utility of itself and its siblings
-    except in nested logit, its sib group is restricted to the nest
+    Compute nested probabilities for nest leafs and nodes.
 
     Parameters
     ----------
+    state : workflow.State
+        The workflow state object.
     nested_exp_utilities : pandas.DataFrame
-        dataframe with the exponentiated nested utilities of all leaves and nodes
+        DataFrame with the exponentiated nested utilities of all leaves and nodes.
     nest_spec : dict
-        Nest tree dict from the model spec yaml file
+        Nest tree dict from the model spec yaml file.
+    trace_label : str
+        Label for tracing/logging.
+
     Returns
     -------
-    nested_probabilities : pandas.DataFrame
-        Will have the index of `nested_exp_utilities` and columns for leaf and node probabilities
+    pandas.DataFrame
+        DataFrame with the index of `nested_exp_utilities` and columns for leaf and node probabilities.
     """
 
     nested_probabilities = pd.DataFrame(index=nested_exp_utilities.index)
@@ -1125,23 +1126,21 @@ def compute_nested_probabilities(
 
 def compute_base_probabilities(nested_probabilities, nests, spec):
     """
-    compute base probabilities for nest leaves
-    Base probabilities will be the nest-adjusted probabilities of all leaves
-    This flattens or normalizes all the nested probabilities so that they have the proper global
-    relative values (the leaf probabilities sum to 1 for each row.)
+    Compute base probabilities for nest leaves.
 
     Parameters
     ----------
     nested_probabilities : pandas.DataFrame
-        dataframe with the nested probabilities for nest leafs and nodes
+        DataFrame with the nested probabilities for nest leafs and nodes.
     nests : dict
-        Nest tree dict from the model spec yaml file
-    spec : pandas.Dataframe
-        simple simulate spec so we can return columns in appropriate order
+        Nest tree dict from the model spec yaml file.
+    spec : pandas.DataFrame
+        Simple simulate spec so we can return columns in appropriate order.
+
     Returns
     -------
-    base_probabilities : pandas.DataFrame
-        Will have the index of `nested_probabilities` and columns for leaf base probabilities
+    pandas.DataFrame
+        DataFrame with the index of `nested_probabilities` and columns for leaf base probabilities.
     """
 
     base_probabilities = pd.DataFrame(index=nested_probabilities.index)
@@ -1191,31 +1190,39 @@ def eval_mnl(
 
     Parameters
     ----------
+    state : workflow.State
+        The workflow state object.
     choosers : pandas.DataFrame
+        DataFrame of choosers.
     spec : pandas.DataFrame
         A table of variable specifications and coefficient values.
         Variable expressions should be in the table index and the table
         should have a column for each alternative.
-    locals_d : Dict or None
-        This is a dictionary of local variables that will be the environment
-        for an evaluation of an expression that begins with @
-    custom_chooser : function(state, probs, choosers, spec, trace_label) returns choices, rands
-        custom alternative to logit.make_choices
-    estimator : Estimator object
-        called to report intermediate table results (used for estimation)
-    trace_label: str
-        This is the label to be used  for trace log file entries and dump file names
-        when household tracing enabled. No tracing occurs if label is empty or None.
-    trace_choice_name: str
-        This is the column label to be used in trace file csv dump of choices
-    trace_column_names: str or list of str
-        chooser columns to include when tracing expression_values
+    locals_d : dict or None
+        Dictionary of local variables for expression evaluation.
+    custom_chooser : function
+        Custom alternative to logit.make_choices.
+    estimator : Estimator
+        Estimator object for estimation mode.
+    log_alt_losers : bool
+        Write out expressions when all alternatives are unavailable.
+    want_logsums : bool
+        Whether to return logsums instead of choices.
+    trace_label : str or None
+        Label for tracing/logging.
+    trace_choice_name : str or None
+        Column label for trace file csv dump of choices.
+    trace_column_names : str or list of str or None
+        Chooser columns to include when tracing expression_values.
+    chunk_sizer : ChunkSizer
+        ChunkSizer object for logging.
+    compute_settings : ComputeSettings or None
+        Settings for sharrow. If not given, the default settings are used.
 
     Returns
     -------
-    choices : pandas.Series
-        Index will be that of `choosers`, values will match the columns
-        of `spec`.
+    pandas.Series
+        Index will be that of `choosers`, values will match the columns of `spec`.
     """
 
     # FIXME - not implemented because not currently needed
@@ -1306,36 +1313,42 @@ def eval_nl(
 
     Parameters
     ----------
+    state : workflow.State
+        The workflow state object.
     choosers : pandas.DataFrame
+        DataFrame of choosers.
     spec : pandas.DataFrame
         A table of variable specifications and coefficient values.
         Variable expressions should be in the table index and the table
         should have a column for each alternative.
-    nest_spec:
-        dictionary specifying nesting structure and nesting coefficients
-        (from the model spec yaml file)
-    locals_d : Dict or None
-        This is a dictionary of local variables that will be the environment
-        for an evaluation of an expression that begins with @
-    custom_chooser : function(probs, choosers, spec, trace_label) returns choices, rands
-        custom alternative to logit.make_choices
-    estimator : Estimator object
-        called to report intermediate table results (used for estimation)
-    trace_label: str
-        This is the label to be used  for trace log file entries and dump file names
-        when household tracing enabled. No tracing occurs if label is empty or None.
-    trace_choice_name: str
-        This is the column label to be used in trace file csv dump of choices
-    trace_column_names: str or list of str
-        chooser columns to include when tracing expression_values
-    fastmath : bool, default True
-        Use fastmath for sharrow compiled code.
+    nest_spec : dict
+        Dictionary specifying nesting structure and nesting coefficients.
+    locals_d : dict or None
+        Dictionary of local variables for expression evaluation.
+    custom_chooser : function
+        Custom alternative to logit.make_choices.
+    estimator : Estimator
+        Estimator object for estimation mode.
+    log_alt_losers : bool
+        Write out expressions when all alternatives are unavailable.
+    want_logsums : bool
+        Whether to return logsums instead of choices.
+    trace_label : str or None
+        Label for tracing/logging.
+    trace_choice_name : str or None
+        Column label for trace file csv dump of choices.
+    trace_column_names : str or list of str or None
+        Chooser columns to include when tracing expression_values.
+    chunk_sizer : ChunkSizer
+        ChunkSizer object for logging.
+    compute_settings : ComputeSettings or None
+        Settings for sharrow. If not given, the default settings are used.
 
     Returns
     -------
-    choices : pandas.Series
-        Index will be that of `choosers`, values will match the columns
-        of `spec`.
+    pandas.Series or pandas.DataFrame
+        Index will be that of `choosers`, values will match the columns of `spec`.
+        If want_logsums is True, returns a DataFrame with choices and logsums.
     """
 
     trace_label = tracing.extend_trace_label(trace_label, "eval_nl")
@@ -1497,42 +1510,44 @@ def _simple_simulate(
 
     Parameters
     ----------
+    state : workflow.State
+        The workflow state object.
     choosers : pandas.DataFrame
+        DataFrame of choosers.
     spec : pandas.DataFrame
         A table of variable specifications and coefficient values.
         Variable expressions should be in the table index and the table
         should have a column for each alternative.
-    nest_spec:
-        for nested logit (nl): dictionary specifying nesting structure and nesting coefficients
-        for multinomial logit (mnl): None
-    skims : Skims object
-        The skims object is used to contain multiple matrices of
-        origin-destination impedances.  Make sure to also add it to the
-        locals_d below in order to access it in expressions.  The *only* job
-        of this method in regards to skims is to call set_df with the
-        dataframe that comes back from interacting choosers with
-        alternatives.  See the skims module for more documentation on how
-        the skims object is intended to be used.
-    locals_d : Dict
-        This is a dictionary of local variables that will be the environment
-        for an evaluation of an expression that begins with @
-    custom_chooser : CustomChooser_T
-    estimator : function(df, label, table_name)
-        called to report intermediate table results (used for estimation)
-
-    trace_label: str
-        This is the label to be used  for trace log file entries and dump file names
-        when household tracing enabled. No tracing occurs if label is empty or None.
-    trace_choice_name: str
-        This is the column label to be used in trace file csv dump of choices
-    trace_column_names: str or list of str
-        chooser columns to include when tracing expression_values
+    nest_spec : dict or None
+        For nested logit: dictionary specifying nesting structure and coefficients.
+        For multinomial logit: None.
+    skims : object, optional
+        Skims object for OD impedance matrices.
+    locals_d : dict, optional
+        Dictionary of local variables for expression evaluation.
+    custom_chooser : function, optional
+        Custom alternative to logit.make_choices.
+    log_alt_losers : bool, optional
+        Write out expressions when all alternatives are unavailable.
+    want_logsums : bool, optional
+        Whether to return logsums instead of choices.
+    estimator : function, optional
+        Called to report intermediate table results (used for estimation).
+    trace_label : str, optional
+        Label for tracing/logging.
+    trace_choice_name : str, optional
+        Column label for trace file csv dump of choices.
+    trace_column_names : str or list of str, optional
+        Chooser columns to include when tracing expression_values.
+    chunk_sizer : ChunkSizer
+        ChunkSizer object for logging.
+    compute_settings : ComputeSettings or None
+        Settings for sharrow. If not given, the default settings are used.
 
     Returns
     -------
-    choices : pandas.Series
-        Index will be that of `choosers`, values will match the columns
-        of `spec`.
+    pandas.Series or pandas.DataFrame
+        Index will be that of `choosers`, values will match the columns of `spec`.
     """
 
     if skims is not None:
@@ -1601,22 +1616,34 @@ def _simple_simulate(
 
 
 def tvpb_skims(skims):
-    def list_of_skims(skims):
-        return (
-            skims
-            if isinstance(skims, list)
-            else skims.values()
-            if isinstance(skims, dict)
-            else [skims]
-            if skims is not None
-            else []
-        )
+    """
+    Return a list of TransitVirtualPathLogsumWrapper skims from a skims object.
 
-    return [
-        skim
-        for skim in list_of_skims(skims)
-        if isinstance(skim, pathbuilder.TransitVirtualPathLogsumWrapper)
-    ]
+    Parameters
+    ----------
+    skims : object, list, or dict
+        Skims object or collection of skims.
+
+    Returns
+    -------
+    list
+        List of TransitVirtualPathLogsumWrapper objects.
+    """
+
+    skims = (
+        skims
+        if isinstance(skims, list)
+        else skims.values()
+        if isinstance(skims, dict)
+        else [skims]
+    )
+
+    # assume any object in skims can be treated as a skim
+    for skim in skims:
+        try:
+            skim.set_df(df)
+        except AttributeError:
+            pass
 
 
 def simple_simulate(
@@ -1639,11 +1666,46 @@ def simple_simulate(
     Run an MNL or NL simulation for when the model spec does not involve alternative
     specific data, e.g. there are no interactions with alternative
     properties and no need to sample from alternatives.
+
+    Parameters
+    ----------
+    state : workflow.State
+        The workflow state object.
+    choosers : pandas.DataFrame
+        DataFrame of choosers.
+    spec : pandas.DataFrame
+        A table of variable specifications and coefficient values.
+        Variable expressions should be in the table index and the table
+        should have a column for each alternative.
+    nest_spec : dict or None
+        For nested logit: dictionary specifying nesting structure and coefficients.
+        For multinomial logit: None.
+    skims : object, optional
+        Skims object for OD impedance matrices.
+    locals_d : dict, optional
+        Dictionary of local variables for expression evaluation.
+    custom_chooser : function, optional
+        Custom alternative to logit.make_choices.
+    log_alt_losers : bool, optional
+        Write out expressions when all alternatives are unavailable.
+    want_logsums : bool, optional
+        Whether to return logsums instead of choices.
+    estimator : function, optional
+        Called to report intermediate table results (used for estimation).
+    trace_label : str, optional
+        Label for tracing/logging.
+    trace_choice_name : str, optional
+        Column label for trace file csv dump of choices.
+    trace_column_names : str or list of str, optional
+        Chooser columns to include when tracing expression_values.
+    compute_settings : ComputeSettings or None
+        Settings for sharrow. If not given, the default settings are used.
+
+    Returns
+    -------
+    pandas.Series or pandas.DataFrame
+        Index will be that of `choosers`, values will match the columns of `spec`.
     """
-
-    trace_label = tracing.extend_trace_label(trace_label, "simple_simulate")
-
-    assert len(choosers) > 0
 
     result_list = []
     # segment by person type and pick the right spec for each person type
@@ -1699,8 +1761,43 @@ def simple_simulate_by_chunk_id(
     compute_settings: ComputeSettings | None = None,
 ):
     """
-    chunk_by_chunk_id wrapper for simple_simulate
+    Chunk-by-chunk-id wrapper for simple_simulate.
+
+    Parameters
+    ----------
+    state : workflow.State
+        The workflow state object.
+    choosers : pandas.DataFrame
+        DataFrame of choosers.
+    spec : pandas.DataFrame
+        A table of variable specifications and coefficient values.
+    nest_spec : dict or None
+        Nest specification or None.
+    skims : object, optional
+        Skims object for OD impedance matrices.
+    locals_d : dict, optional
+        Dictionary of local variables for expression evaluation.
+    custom_chooser : function, optional
+        Custom alternative to logit.make_choices.
+    log_alt_losers : bool, optional
+        Write out expressions when all alternatives are unavailable.
+    want_logsums : bool, optional
+        Whether to return logsums instead of choices.
+    estimator : function, optional
+        Called to report intermediate table results (used for estimation).
+    trace_label : str, optional
+        Label for tracing/logging.
+    trace_choice_name : str, optional
+        Column label for trace file csv dump of choices.
+    compute_settings : ComputeSettings or None
+        Settings for sharrow. If not given, the default settings are used.
+
+    Returns
+    -------
+    pandas.Series or pandas.DataFrame
+        Index will be that of `choosers`, values will match the columns of `spec`.
     """
+
     choices = None
     result_list = []
     for (
@@ -1747,12 +1844,29 @@ def eval_mnl_logsums(
     compute_settings: ComputeSettings | None = None,
 ):
     """
-    like eval_nl except return logsums instead of making choices
+    Like eval_nl except return logsums instead of making choices.
+
+    Parameters
+    ----------
+    state : workflow.State
+        The workflow state object.
+    choosers : pandas.DataFrame
+        DataFrame of choosers.
+    spec : pandas.DataFrame
+        A table of variable specifications and coefficient values.
+    locals_d : dict
+        Dictionary of local variables for expression evaluation.
+    trace_label : str, optional
+        Label for tracing/logging.
+    chunk_sizer : ChunkSizer
+        ChunkSizer object for logging.
+    compute_settings : ComputeSettings or None
+        Settings for sharrow. If not given, the default settings are used.
 
     Returns
     -------
-    logsums : pandas.Series
-        Index will be that of `choosers`, values will be logsum across spec column values
+    pandas.Series
+        Index will be that of `choosers`, values will be logsum across spec column values.
     """
 
     # FIXME - untested and not currently used by any models...
@@ -1809,15 +1923,17 @@ def _preprocess_tvpb_logsums_on_choosers(choosers, spec, locals_d):
 
     Parameters
     ----------
-    choosers
-    spec
-    locals_d
+    choosers : pandas.DataFrame
+        DataFrame of choosers.
+    spec : pandas.DataFrame
+        Model spec DataFrame.
+    locals_d : dict
+        Dictionary of local variables for expression evaluation.
 
     Returns
     -------
-    choosers
-    spec
-
+    tuple
+        (choosers, spec) with TVPB logsum columns preloaded if needed.
     """
     spec_sh = spec.copy()
 
@@ -1891,12 +2007,31 @@ def eval_nl_logsums(
     compute_settings: ComputeSettings | None = None,
 ):
     """
-    like eval_nl except return logsums instead of making choices
+    Like eval_nl except return logsums instead of making choices.
+
+    Parameters
+    ----------
+    state : workflow.State
+        The workflow state object.
+    choosers : pandas.DataFrame
+        DataFrame of choosers.
+    spec : pandas.DataFrame
+        Model spec DataFrame.
+    nest_spec : dict
+        Nest specification.
+    locals_d : dict
+        Dictionary of local variables for expression evaluation.
+    trace_label : str, optional
+        Label for tracing/logging.
+    chunk_sizer : ChunkSizer
+        ChunkSizer object for logging.
+    compute_settings : ComputeSettings or None
+        Settings for sharrow. If not given, the default settings are used.
 
     Returns
     -------
-    logsums : pandas.Series
-        Index will be that of `choosers`, values will be nest logsum based on spec column values
+    pandas.Series
+        Index will be that of `choosers`, values will be nest logsum based on spec column values.
     """
 
     trace_label = tracing.extend_trace_label(trace_label, "eval_nl_logsums")
@@ -1973,12 +2108,33 @@ def _simple_simulate_logsums(
     compute_settings: ComputeSettings | None = None,
 ):
     """
-    like simple_simulate except return logsums instead of making choices
+    Like simple_simulate except return logsums instead of making choices.
+
+    Parameters
+    ----------
+    state : workflow.State
+        The workflow state object.
+    choosers : pandas.DataFrame
+        DataFrame of choosers.
+    spec : pandas.DataFrame
+        Model spec DataFrame.
+    nest_spec : dict or None
+        Nest specification or None.
+    skims : object, optional
+        Skims object for OD impedance matrices.
+    locals_d : dict, optional
+        Dictionary of local variables for expression evaluation.
+    trace_label : str, optional
+        Label for tracing/logging.
+    chunk_sizer : ChunkSizer
+        ChunkSizer object for logging.
+    compute_settings : ComputeSettings or None
+        Settings for sharrow. If not given, the default settings are used.
 
     Returns
     -------
-    logsums : pandas.Series
-        Index will be that of `choosers`, values will be nest logsum based on spec column values
+    pandas.Series
+        Index will be that of `choosers`, values will be nest logsum based on spec column values.
     """
 
     if skims is not None:
@@ -2042,12 +2198,37 @@ def simple_simulate_logsums(
     compute_settings: ComputeSettings | None = None,
 ):
     """
-    like simple_simulate except return logsums instead of making choices
+    Like simple_simulate except return logsums instead of making choices.
+
+    Parameters
+    ----------
+    state : workflow.State
+        The workflow state object.
+    choosers : pandas.DataFrame
+        DataFrame of choosers.
+    spec : pandas.DataFrame
+        Model spec DataFrame.
+    nest_spec : dict or None
+        Nest specification or None.
+    skims : object, optional
+        Skims object for OD impedance matrices.
+    locals_d : dict, optional
+        Dictionary of local variables for expression evaluation.
+    chunk_size : int, optional
+        Chunk size for adaptive chunking.
+    trace_label : str, optional
+        Label for tracing/logging.
+    chunk_tag : str, optional
+        Tag for chunking.
+    explicit_chunk_size : int, optional
+        Explicit chunk size for adaptive chunking.
+    compute_settings : ComputeSettings or None
+        Settings for sharrow. If not given, the default settings are used.
 
     Returns
     -------
-    logsums : pandas.Series
-        Index will be that of `choosers`, values will be nest logsum based on spec column values
+    pandas.Series
+        Index will be that of `choosers`, values will be nest logsum based on spec column values.
     """
 
     assert len(choosers) > 0
