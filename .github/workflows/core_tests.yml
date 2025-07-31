@@ -320,7 +320,6 @@ jobs:
           uv run pytest activitysim/estimation/test/test_larch_estimation.py --durations=0
 
   estimation_notebooks:
-    needs: foundation
     env:
       python-version: "3.10"
       label: win-64
@@ -359,6 +358,8 @@ jobs:
       - name: Create Estimation Data
         run: |
           uv run --group github-action python activitysim/examples/example_estimation/notebooks/est_mode_setup.py --household_sample_size 5000
+
+      - run: Get-ChildItem -Path ./* -Include *.ipynb -Recurse
 
       - name: Test Estimation Notebooks
         run: |
