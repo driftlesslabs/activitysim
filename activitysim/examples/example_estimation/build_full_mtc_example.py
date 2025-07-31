@@ -30,6 +30,7 @@ import argparse
 import os
 import shutil
 import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -74,9 +75,7 @@ def main(working_dir: Path, household_sample_size: int, skip_to_edb: bool = Fals
 
         subprocess.run(
             [
-                "uv"
-                "run"
-                "python",
+                sys.executable,
                 "-m",
                 "activitysim",
                 "run",
@@ -134,9 +133,7 @@ def main(working_dir: Path, household_sample_size: int, skip_to_edb: bool = Fals
 
     subprocess.run(
         [
-            "uv"
-            "run"
-            "python",
+            sys.executable,
             "-m",
             "activitysim",
             "run",
