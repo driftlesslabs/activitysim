@@ -350,11 +350,11 @@ jobs:
 
       - name: Create Estimation Data
         run: |
-          uv run --only-group github-action python activitysim/examples/example_estimation/notebooks/est_mode_setup.py --household_sample_size 5000
+          uv run --group github-action python activitysim/examples/example_estimation/notebooks/est_mode_setup.py --household_sample_size 5000
 
       - name: Test Estimation Notebooks
         run: |
-          uv run --only-group github-action pytest activitysim/examples/example_estimation/notebooks/*.ipynb \
+          uv run --group github-action pytest activitysim/examples/example_estimation/notebooks/*.ipynb \
             --nbmake-timeout=3000 \
             --ignore=activitysim/examples/example_estimation/notebooks/01_estimation_mode.ipynb
 
