@@ -74,6 +74,8 @@ def main(working_dir: Path, household_sample_size: int, skip_to_edb: bool = Fals
 
         subprocess.run(
             [
+                "uv"
+                "run"
                 "python",
                 "-m",
                 "activitysim",
@@ -132,6 +134,8 @@ def main(working_dir: Path, household_sample_size: int, skip_to_edb: bool = Fals
 
     subprocess.run(
         [
+            "uv"
+            "run"
             "python",
             "-m",
             "activitysim",
