@@ -320,6 +320,7 @@ jobs:
           uv run pytest activitysim/estimation/test/test_larch_estimation.py --durations=0
 
   estimation_notebooks:
+    needs: foundation
     env:
       python-version: "3.10"
       label: win-64
