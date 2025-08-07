@@ -369,7 +369,7 @@ jobs:
 
       - name: Test Estimation Notebooks
         run: |
-          uv run --group github-action python -m pytest **/notebooks/*.ipynb --nbmake-timeout=3000 --ignore=01_estimation_mode.ipynb
+          uv run --group github-action pytest activitysim/examples/example_estimation/notebooks --nbmake-timeout=3000 --ignore=activitysim/examples/example_estimation/notebooks/01_estimation_mode.ipynb
 
   estimation_edb_creation:
     needs: estimation_notebooks
