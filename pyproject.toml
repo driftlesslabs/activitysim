@@ -162,6 +162,7 @@ github-action = [
     "pytest-regressions",
     "requests>=2.32.3",
     "ruff",
+    "xlsxwriter==3.2.5",
     "zarr>=2,<3",
     "zstandard",
 ]
