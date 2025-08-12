@@ -347,6 +347,9 @@ jobs:
           enable-cache: true
           cache-dependency-glob: "uv.lock"
 
+      - name: setup graphviz
+        uses: ts-graphviz/setup-graphviz@v2
+
       - name: Install activitysim
         run: |
           uv sync --locked --group github-action
@@ -369,7 +372,7 @@ jobs:
 
       - name: Test Estimation Notebooks
         run: |
-          uv run --group github-action pytest activitysim/examples/example_estimation/notebooks --nbmake-timeout=3000 --ignore=activitysim/examples/example_estimation/notebooks/01_estimation_mode.ipynb
+          uv run --group github-action pytest activitysim/examples/example_estimation/notebooks --nbmake-timeout=3000 --ignore=activitysim/examples/example_estimation/notebooks/01_estimation_mode.ipynb --ignore=activitysim/examples/example_estimation/notebooks/test-estimation-data/**
 
   estimation_edb_creation:
     needs: estimation_notebooks
