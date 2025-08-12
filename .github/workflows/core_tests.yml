@@ -363,16 +363,23 @@ jobs:
           uv run --group github-action python -c "import requests; print(requests.__version__)"
 
       - name: Collect Estimation Notebooks
-        run: |
-          uv run --group github-action pytest activitysim/examples/example_estimation/notebooks --nbmake-timeout=3000 --ignore=activitysim/examples/example_estimation/notebooks/01_estimation_mode.ipynb --collect-only
+        run: >
+          uv run --group github-action pytest activitysim/examples/example_estimation/notebooks 
+          --nbmake-timeout=3000 
+          --ignore=activitysim/examples/example_estimation/notebooks/01_estimation_mode.ipynb 
+          --ignore-glob=activitysim/examples/example_estimation/notebooks/test-estimation-data/**
+          --collect-only
 
       - name: Create Estimation Data
         run: |
           uv run --group github-action python activitysim/examples/example_estimation/notebooks/est_mode_setup.py --household_sample_size 5000
 
       - name: Test Estimation Notebooks
-        run: |
-          uv run --group github-action pytest activitysim/examples/example_estimation/notebooks --nbmake-timeout=3000 --ignore=activitysim/examples/example_estimation/notebooks/01_estimation_mode.ipynb --ignore=activitysim/examples/example_estimation/notebooks/test-estimation-data/**
+        run: >
+          uv run --group github-action pytest activitysim/examples/example_estimation/notebooks 
+          --nbmake-timeout=3000 
+          --ignore=activitysim/examples/example_estimation/notebooks/01_estimation_mode.ipynb 
+          --ignore-glob=activitysim/examples/example_estimation/notebooks/test-estimation-data/**
 
   estimation_edb_creation:
     needs: estimation_notebooks
