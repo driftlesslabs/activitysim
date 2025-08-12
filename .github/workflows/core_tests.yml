@@ -70,7 +70,7 @@ jobs:
   cross-platform:
     # also test foundation cross platforms, but do not require a successful
     # completion before starting regional model tests
-    needs: estimation_notebooks
+    needs: foundation
     strategy:
       matrix:
         include:
@@ -130,7 +130,7 @@ jobs:
 
 
   builtin_regional_models:
-    needs: estimation_notebooks
+    needs: foundation
     env:
       python-version: "3.10"
       label: win-64
@@ -199,7 +199,7 @@ jobs:
           uv run pytest activitysim/examples/${{ matrix.region }}/test --durations=0
 
   external_regional_models:
-    needs: estimation_notebooks
+    needs: foundation
     env:
       python-version: "3.10"
       label: win-64
@@ -253,7 +253,7 @@ jobs:
           uv run pytest .
 
   random_seed_generation:
-    needs: estimation_notebooks
+    needs: foundation
     env:
       python-version: "3.10"
       label: win-64
@@ -287,7 +287,7 @@ jobs:
           uv run pytest test/random_seed/test_random_seed.py --durations=0
 
   estimation_mode:
-    needs: estimation_notebooks
+    needs: foundation
     env:
       python-version: "3.10"
       label: win-64
@@ -331,10 +331,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - run: Get-ChildItem -Path ./* -Include *.ipynb -Recurse
-
-      - run: Get-ChildItem -Path ./activitysim/examples/example_estimation/notebooks/* -Include *.ipynb -Recurse
-
       - name: "Set up Python"
         uses: actions/setup-python@v5
         with:
@@ -354,25 +350,10 @@ jobs:
         run: |
           uv sync --locked --group github-action
 
-      - name: Check Imports
-        run: |
-          uv run --group github-action python -c "import activitysim; print(activitysim.__version__)"
-
-      - name: Check Imports 2
-        run: |
-          uv run --group github-action python -c "import requests; print(requests.__version__)"
-
-      - name: Collect Estimation Notebooks
-        run: >
-          uv run --group github-action pytest activitysim/examples/example_estimation/notebooks 
-          --nbmake-timeout=3000 
-          --ignore=activitysim/examples/example_estimation/notebooks/01_estimation_mode.ipynb 
-          --ignore-glob=activitysim/examples/example_estimation/notebooks/test-estimation-data/**
-          --collect-only
-
       - name: Create Estimation Data
-        run: |
-          uv run --group github-action python activitysim/examples/example_estimation/notebooks/est_mode_setup.py --household_sample_size 5000
+        run: >
+          uv run --group github-action python activitysim/examples/example_estimation/notebooks/est_mode_setup.py 
+          --household_sample_size 5000
 
       - name: Test Estimation Notebooks
         run: >
@@ -382,7 +363,7 @@ jobs:
           --ignore-glob=activitysim/examples/example_estimation/notebooks/test-estimation-data/**
 
   estimation_edb_creation:
-    needs: estimation_notebooks
+    needs: foundation
     env:
       python-version: "3.10"
       label: win-64
@@ -415,7 +396,7 @@ jobs:
           uv run pytest activitysim/estimation/test/test_edb_creation/test_edb_formation.py --durations=0
 
   develop-docbuild:
-    needs: estimation_notebooks
+    needs: foundation
     if: github.ref_name == 'main' || github.ref_name == 'docs-fix'
     name: develop-docbuild
     runs-on: ubuntu-latest
