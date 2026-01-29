@@ -6,6 +6,7 @@ or code to utilize, as well as breaking changes that may cause existing model
 configurations or code to fail to run correctly.
 
 
+
 ## Upcoming Changes
 
 This section describes changes that are implemented in current development
@@ -23,6 +24,46 @@ data being processed contains `NaN` or `Inf` values.  By defaulting to
 to enable the "fastmath" optimization can do so by setting the `fastmath` option
 to `True` in the `compute_settings` for each model component where it is desired.
 
+### Shadow Price Zones Reopening
+
+We fixed an issue with reopening work and school zones during iterative shadow pricing using the
+simulation-based constraint mechanism. Now, when zones are closed, they remained closed. (See
+ActivitySim [Issue #820](https://github.com/ActivitySim/activitysim/issues/820) for more details.)
+There is nothing for the user to do to take advantage of this fix, but it may slightly change
+results for models that use shadow pricing. Aggregate level outputs should remain very stable, but
+some individual choices of school and work locations may change due to the fix.
+
+### Alternative file naming consistency
+
+We have enforced a naming scheme for alternative config files to have the index name
+be 'alt' instead of 'Alt'. This is to maintain consistency across all config files.
+The code will handle this for you, but you will get a deprecation warning if you
+are using 'Alt' in your config files. Please update your config files to use 'alt'.
+See ActivitySim issue [#846](https://github.com/ActivitySim/activitysim/issues/846)
+
+### CDAP Estimation Mode
+
+A bug has been fixed in the Larch portion of code for the re-estimation of CDAP
+parameters.  Prior to this fix, interaction terms for 3 and 4 person households
+were not being correctly specified in the Larch model.  Each of these household
+sizes is supposed to have three unique interaction terms, one each for the
+entire household adopting the same daily activity pattern (M, N or H).  However,
+due to a coding error, the same parameter was being used across all three household
+sizes.  This has now been fixed, and the correct interaction terms are now specified
+for each household size.  Users who re-estimated CDAP parameters using Larch with
+prior versions of ActivitySim may want to review and/or re-estimate any CDAP
+parameters to ensure that they are correct.  It is not expected that this error
+will have a significant impact on simulated travel behavior outcomes, as it is only
+a few parameters with a large and complex model, and the overall behavioral
+characteristics of 3, 4, and 5-person households are expected to be somewhat
+similar to each other in any case.  If users wish to formally correct their model
+to reflect the mathematical formulation that was actually estimated in prior
+versions of ActivitySim without re-estimating the entire model, they can set
+`coef_[M,N,H]_xxx `and `coef_[M,N,H]_xxxx` to have the same value as
+`coef_[M,N,H]_xxxxx`. This change may impact model calibration, so it is recommended
+to proceed with caution if choosing this option. For an existing well calibrated model,
+the calibration may have already compensated for this error in the estimation,
+so changing the coefficients may lead to degraded model quality.
 
 ## v1.5.1
 
