@@ -70,6 +70,9 @@ def utilities(choosers, spec, test_data):
     )
 
 
+# TODO-EET: Add tests here!
+
+
 def test_utils_to_probs(utilities, test_data):
     state = workflow.State().default_settings()
     probs = logit.utils_to_probs(state, utilities, trace_label=None)
