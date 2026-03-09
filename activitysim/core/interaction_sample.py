@@ -18,9 +18,9 @@ from activitysim.core import (
     workflow,
 )
 from activitysim.core.configuration.base import ComputeSettings
+from activitysim.core.exceptions import SegmentedSpecificationError
 from activitysim.core.skim_dataset import DatasetWrapper
 from activitysim.core.skim_dictionary import SkimWrapper
-from activitysim.core.exceptions import SegmentedSpecificationError
 
 logger = logging.getLogger(__name__)
 
@@ -574,7 +574,9 @@ def _interaction_sample(
     if use_eet:
 
         if estimation.manager.enabled:
-            raise ValueError("cannot use explicit error terms with estimation mode at this time")
+            raise ValueError(
+                "cannot use explicit error terms with estimation mode at this time"
+            )
 
         utilities = logit.validate_utils(
             state,
