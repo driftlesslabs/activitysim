@@ -122,7 +122,7 @@ requires-dist = [
     { name = "requests", specifier = ">=2.7" },
     { name = "scikit-learn", specifier = ">=1.2" },
     { name = "setuptools", specifier = ">=80.9.0" },
-    { name = "sharrow", specifier = ">=2.15" },
+    { name = "sharrow", specifier = ">=2.15.0" },
     { name = "sparse" },
     { name = "tables", specifier = ">=3.9" },
     { name = "xarray", specifier = ">=2024.5" },
@@ -152,7 +152,7 @@ dev = [
     { name = "myst-parser" },
     { name = "nbconvert" },
     { name = "nbformat" },
-    { name = "nbmake", specifier = "==1.4.6" },
+    { name = "nbmake", specifier = "==1.5.5" },
     { name = "numexpr" },
     { name = "numpydoc" },
     { name = "pre-commit" },
@@ -160,7 +160,7 @@ dev = [
     { name = "pydata-sphinx-theme" },
     { name = "pydot", specifier = ">=4.0.1" },
     { name = "pyinstrument", specifier = "==4.4" },
-    { name = "pytest", specifier = "==7.2" },
+    { name = "pytest", specifier = ">=8.4.2" },
     { name = "pytest-cov" },
     { name = "pytest-regressions" },
     { name = "requests", specifier = ">=2.32.3" },
@@ -2811,7 +2811,7 @@ wheels = [
 
 [[package]]
 name = "nbmake"
-version = "1.4.6"
+version = "1.5.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "ipykernel" },
@@ -2820,9 +2820,9 @@ dependencies = [
     { name = "pygments" },
     { name = "pytest" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/e5/b7/69206084d99046c5f9153dbc1329a6039c7e9234f3d1ea11e0dbd0bb293c/nbmake-1.4.6.tar.gz", hash = "sha256:874c5b9d99922f88bf0c92a3b869e75bff154edba2538efef0a1d7ad2263f5fb", size = 13996, upload-time = "2023-10-16T10:14:37.712Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/43/9a/aae201cee5639e1d562b3843af8fd9f8d018bb323e776a2b973bdd5fc64b/nbmake-1.5.5.tar.gz", hash = "sha256:239dc868ea13a7c049746e2aba2c229bd0f6cdbc6bfa1d22f4c88638aa4c5f5c", size = 85929, upload-time = "2024-12-23T18:33:46.774Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/70/06/c4d83f6eeb9a3624902b9bb619beeed593a9eb304f5246b784d91bfe1623/nbmake-1.4.6-py3-none-any.whl", hash = "sha256:233603c9186c659cb42524de36b556197c352ede1f9daeaa1b1141dfad226218", size = 13378, upload-time = "2023-10-16T10:14:36.372Z" },
+    { url = "https://files.pythonhosted.org/packages/eb/be/b257e12f9710819fde40adc972578bee6b72c5992da1bc8369bef2597756/nbmake-1.5.5-py3-none-any.whl", hash = "sha256:c6fbe6e48b60cacac14af40b38bf338a3b88f47f085c54ac5b8639ff0babaf4b", size = 12818, upload-time = "2024-12-23T18:33:44.566Z" },
 ]
 
 [[package]]
@@ -4136,20 +4136,20 @@ wheels = [
 
 [[package]]
 name = "pytest"
-version = "7.2.0"
+version = "9.0.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "attrs" },
     { name = "colorama", marker = "sys_platform == 'win32'" },
     { name = "exceptiongroup", marker = "python_full_version < '3.11'" },
     { name = "iniconfig" },
     { name = "packaging" },
     { name = "pluggy" },
+    { name = "pygments" },
     { name = "tomli", marker = "python_full_version < '3.11'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/0b/21/055f39bf8861580b43f845f9e8270c7786fe629b2f8562ff09007132e2e7/pytest-7.2.0.tar.gz", hash = "sha256:c4014eb40e10f11f355ad4e3c2fb2c6c6d1919c73f3b5a433de4708202cade59", size = 1300608, upload-time = "2022-10-25T07:58:12.847Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/7d/0d/549bd94f1a0a402dc8cf64563a117c0f3765662e2e668477624baeec44d5/pytest-9.0.3.tar.gz", hash = "sha256:b86ada508af81d19edeb213c681b1d48246c1a91d304c6c81a427674c17eb91c", size = 1572165, upload-time = "2026-04-07T17:16:18.027Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/67/68/a5eb36c3a8540594b6035e6cdae40c1ef1b6a2bfacbecc3d1a544583c078/pytest-7.2.0-py3-none-any.whl", hash = "sha256:892f933d339f068883b6fd5a459f03d85bfcb355e4981e146d2c7616c21fef71", size = 316791, upload-time = "2022-10-25T07:58:10.747Z" },
+    { url = "https://files.pythonhosted.org/packages/d4/24/a372aaf5c9b7208e7112038812994107bc65a84cd00e0354a88c2c77a617/pytest-9.0.3-py3-none-any.whl", hash = "sha256:2c5efc453d45394fdd706ade797c0a81091eccd1d6e4bccfcd476e2b8e0ab5d9", size = 375249, upload-time = "2026-04-07T17:16:16.13Z" },
 ]
 
 [[package]]
