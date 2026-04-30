@@ -9,9 +9,10 @@ from builtins import object, range
 import numpy as np
 import pandas as pd
 
-from activitysim.core.util import reindex
 from activitysim.core.exceptions import DuplicateLoadableObjectError, TableIndexError
+from activitysim.core.util import reindex
 
+from .fast_random import FastChannel
 from .tracing import print_elapsed_time
 
 logger = logging.getLogger(__name__)
@@ -450,7 +451,7 @@ class Random(object):
 
     # channel management
 
-    def add_channel(self, channel_name, domain_df):
+    def add_channel(self, channel_name, domain_df, fast: bool = True):
         """
         Create or extend a channel for generating random number streams for domain_df.
 
@@ -484,7 +485,8 @@ class Random(object):
                 "Adding channel '%s' %s ids" % (channel_name, len(domain_df.index))
             )
 
-            channel = SimpleChannel(
+            channel_class = FastChannel if fast else SimpleChannel
+            channel = channel_class(
                 channel_name, self.base_seed, domain_df, self.step_name
             )
 
