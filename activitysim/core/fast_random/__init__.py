@@ -1603,7 +1603,7 @@ def vector_random_standard_normal(
         ).reshape(-1, *shape)
     else:
         return _vector_random_standard_normal(
-            state_array, state_bytes=_state_bytes
+            state_array, state_bytes=_state_bytes, shape=shape
         ).reshape(-1, *shape)
 
 
@@ -1793,8 +1793,9 @@ def vector_random_standard_uniform(
             selected_positions,
             state_array,
             state_bytes=_state_bytes,
+            shape=shape,
         ).reshape(-1, *shape)
     else:
         return _vector_random_standard_uniform(
-            state_array, state_bytes=_state_bytes
+            state_array, state_bytes=_state_bytes, shape=shape
         ).reshape(-1, *shape)
