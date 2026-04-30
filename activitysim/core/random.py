@@ -8,10 +8,12 @@ from builtins import object, range
 
 import numpy as np
 import pandas as pd
+from cffi import FFI
 
-from activitysim.core.util import reindex
 from activitysim.core.exceptions import DuplicateLoadableObjectError, TableIndexError
+from activitysim.core.util import reindex
 
+from .fast_random import vector_random_standard_normal, vector_random_standard_uniform
 from .tracing import print_elapsed_time
 
 logger = logging.getLogger(__name__)
@@ -19,6 +21,8 @@ logger = logging.getLogger(__name__)
 # one more than 0xFFFFFFFF so we can wrap using: int64 % _MAX_SEED
 _MAX_SEED = 1 << 32
 _SEED_MASK = 0xFFFFFFFF
+
+_FFI = FFI()
 
 
 def hash32(s):
@@ -35,6 +39,114 @@ def hash32(s):
     s = s.encode("utf8")
     h = hashlib.md5(s).hexdigest()
     return int(h, base=16) & _SEED_MASK
+
+
+class FastChannel:
+    def __init__(
+        self, channel_name, base_seed, domain_df: pd.DataFrame, step_name: str = ""
+    ):
+        self.base_seed = base_seed
+        self.channel_name = channel_name
+        self.channel_seed = hash32(self.channel_name)
+        self.domain_index = domain_df.index.copy()
+        self.step_name = None
+        self.step_seed = None
+        self._bitgenerator = None
+        self._state_array = None
+        if step_name:
+            self.begin_step(step_name)
+
+    def begin_step(self, step_name):
+        """
+        Reseed this channel with new random seeds for this step
+
+        Parameters
+        ----------
+        step_name : str
+            pipeline step name for this step
+        """
+
+        assert self.step_name is None
+
+        self.step_name = step_name
+        self.step_seed = hash32(self.step_name)
+
+        # Seed the bit generators, extracting state along the way
+        state_array = np.empty(shape=[len(self.domain_index), 4], dtype=np.uint64)
+        bitgen = None
+        for n, i in enumerate(self.domain_index):
+            ss = np.random.SeedSequence(
+                [self.base_seed, self.channel_seed, self.step_seed, i]
+            )
+            bitgen = np.random.PCG64(ss)
+            bstate = bitgen.state["state"]
+
+            val_128 = bstate["state"]
+            state_array[n, 0] = val_128 & 0xFFFFFFFFFFFFFFFF
+            state_array[n, 1] = val_128 >> 64
+            val_128 = bstate["inc"]
+            state_array[n, 2] = val_128 & 0xFFFFFFFFFFFFFFFF
+            state_array[n, 3] = val_128 >> 64
+
+        self._bitgenerator = bitgen
+        self._state_array = state_array
+
+    def end_step(self, step_name: str = ""):
+        if step_name:
+            assert self.step_name == step_name
+        self.step_name = None
+        self.step_seed = None
+        self._bitgenerator = None
+        self._state_array = None
+
+    def _check_valid_df(self, df: pd.DataFrame):
+        # check that df.index has no duplicates
+        if len(df.index.unique()) != len(df.index):
+            raise ValueError("DataFrame must have unique index")
+
+        selected_positions = self.domain_index.get_indexer(df.index)
+
+        # check that all df.index values were found in self.domain_index
+        if selected_positions.min() < 0:
+            raise ValueError("DataFrame has index values not found in the domain")
+
+        if self._state_array is None:
+            raise ValueError("outside of a defined step")
+
+        return selected_positions
+
+    def normal_for_df(
+        self,
+        df: pd.DataFrame,
+        step_name: str,
+        mu: float = 0,
+        sigma: float = 1,
+        lognormal: bool = False,
+        size: int | tuple[int, ...] = 1,
+    ) -> np.ndarray:
+        assert step_name is not None
+        assert step_name == self.step_name
+        selected_positions = self._check_valid_df(df)
+
+        mu = np.asarray(mu)
+        sigma = np.asarray(sigma)
+        result = vector_random_standard_normal(
+            self._state_array, selected_positions=selected_positions, shape=size
+        )
+        result = result * sigma + mu
+        if lognormal:
+            result = np.exp(result)
+        return result
+
+    def random_for_df(
+        self, df: pd.DataFrame, step_name: str, n: int | tuple[int, ...] = 1
+    ) -> np.ndarray:
+        assert step_name is not None
+        assert step_name == self.step_name
+        selected_positions = self._check_valid_df(df)
+        return vector_random_standard_uniform(
+            self._state_array, selected_positions=selected_positions, shape=n
+        )
 
 
 class SimpleChannel(object):
