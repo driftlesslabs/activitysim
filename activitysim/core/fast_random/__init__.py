@@ -1,3 +1,40 @@
+# The following C code was lovingly borrowed from numpy:
+#   https://github.com/numpy/numpy/blob/main/numpy/random/src/distributions/ziggurat_constants.h
+#   https://github.com/numpy/numpy/blob/main/numpy/random/src/distributions/distributions.c
+#
+# Copyright (c) 2005-2025, NumPy Developers.
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are
+# met:
+#
+#     * Redistributions of source code must retain the above copyright
+#        notice, this list of conditions and the following disclaimer.
+#
+#     * Redistributions in binary form must reproduce the above
+#        copyright notice, this list of conditions and the following
+#        disclaimer in the documentation and/or other materials provided
+#        with the distribution.
+#
+#     * Neither the name of the NumPy Developers nor the names of any
+#        contributors may be used to endorse or promote products derived
+#        from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+# A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+# OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+# SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+# LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+# DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+# THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+#
+#
 # static const uint64_t ki_double[] = {
 #     0x000EF33D8025EF6AULL, 0x0000000000000000ULL, 0x000C08BE98FBC6A8ULL,
 #     0x000DA354FABD8142ULL, 0x000E51F67EC1EEEAULL, 0x000EB255E9D3F77EULL,
@@ -1320,17 +1357,15 @@ _load_ziggurat_tables()
 @_nb.njit
 def _single_random_standard_normal() -> float:
     """
-    Return a random float from the "standard normal" distribution.
+    Return one sample from the standard normal distribution, :math:`\\mathcal{N}(0, 1)`.
 
-    Parameters
-    ----------
-    state_array
-    state_bytes
+    Uses the module-level PCG64 bit-generator directly via its CFFI pointer
+    (``_state_address``).  Advances the global RNG state in-place.
 
     Returns
     -------
-    out : float
-        Drawn from the standard normal distribution, :math:`\\mathcal{N}(0, 1)`.
+    float
+        A single draw from :math:`\\mathcal{N}(0, 1)`.
 
     Notes
     -----
@@ -1342,14 +1377,6 @@ def _single_random_standard_normal() -> float:
     C comments) to quickly accept the common case (~99.3%).  When the fast
     accept fails, the function falls back to either a tail sample (when
     ``idx == 0``) or a wedge-rejection test against ``exp(-x^2/2)``.
-
-    Examples
-    --------
-    >>> import numpy as np
-    >>> from numpy.random import default_rng
-    >>> rng = default_rng(0)
-    >>> random_standard_normal(rng.bit_generator)  # doctest: +SKIP
-    0.12573022083854095
     """
     ki = _KI_DOUBLE
     wi = _WI_DOUBLE
@@ -1394,20 +1421,33 @@ def _single_random_standard_normal() -> float:
 
 @_nb.njit
 def _several_random_standard_normal(
-    state_array, state_bytes, size: int = 1
+    state_array: _np.ndarray,
+    state_bytes: _np.ndarray,
+    size: int = 1,
 ) -> _np.ndarray:
     """
-    Return a random float from the "standard normal" distribution.
+    Draw ``size`` standard-normal samples for a single RNG state row.
+
+    Loads the RNG state from *state_array* into the shared bit-generator,
+    fills a 1-D array of length *size* with Ziggurat normal samples, then
+    writes the updated state back to *state_array*.
 
     Parameters
     ----------
-    state_array
-    state_bytes
+    state_array : np.ndarray
+        1-D ``uint64`` array of length ≥ 4 holding the PCG64 state for one
+        agent/row.  Mutated in-place with the post-draw state.
+    state_bytes : np.ndarray
+        Byte view (``uint8``) of the shared ``_BIT_GENERATOR`` state buffer.
+        Used as the staging area when injecting and extracting PCG64 state.
+    size : int, optional
+        Number of samples to draw.  Defaults to 1.
 
     Returns
     -------
-    out : float
-        Drawn from the standard normal distribution, :math:`\\mathcal{N}(0, 1)`.
+    np.ndarray
+        1-D ``float64`` array of shape ``(size,)`` containing draws from
+        :math:`\\mathcal{N}(0, 1)`.
 
     Notes
     -----
@@ -1419,14 +1459,6 @@ def _several_random_standard_normal(
     C comments) to quickly accept the common case (~99.3%).  When the fast
     accept fails, the function falls back to either a tail sample (when
     ``idx == 0``) or a wedge-rejection test against ``exp(-x^2/2)``.
-
-    Examples
-    --------
-    >>> import numpy as np
-    >>> from numpy.random import default_rng
-    >>> rng = default_rng(0)
-    >>> random_standard_normal(rng.bit_generator)  # doctest: +SKIP
-    0.12573022083854095
     """
     # write into the BIT_GENERATOR's state from the given state_array
     _state_uint64_ = state_bytes.view(_np.uint64)[3:7]
@@ -1444,10 +1476,31 @@ def _several_random_standard_normal(
 
 @_nb.njit
 def _vector_random_standard_normal(
-    state_array, state_bytes, shape: tuple[int, ...] = (1,)
+    state_array: _np.ndarray,
+    state_bytes: _np.ndarray,
+    shape: tuple[int, ...] = (1,),
 ) -> _np.ndarray:
+    """
+    Draw standard-normal samples for every row of *state_array*.
 
-    # compute the size for the unfolded (flat) trailing dimension.
+    Parameters
+    ----------
+    state_array : np.ndarray
+        2-D ``uint64`` array of shape ``(n_agents, ≥4)`` where each row holds
+        the PCG64 state for one agent.  Mutated in-place.
+    state_bytes : np.ndarray
+        Byte view (``uint8``) of the shared ``_BIT_GENERATOR`` state buffer.
+    shape : tuple of int, optional
+        Trailing dimensions of the per-agent sample block.  The total number
+        of samples per agent equals ``prod(shape)``.  Defaults to ``(1,)``.
+
+    Returns
+    -------
+    np.ndarray
+        2-D ``float64`` array of shape ``(n_agents, prod(shape))``.  Callers
+        that want the trailing dimensions split out should call
+        ``.reshape(n_agents, *shape)`` on the result.
+    """
     flat_size = 1
     for s in shape:
         flat_size *= s
@@ -1462,8 +1515,36 @@ def _vector_random_standard_normal(
 
 @_nb.njit
 def _selected_vector_random_standard_normal(
-    selected_positions, state_array, state_bytes, shape: tuple[int, ...] = (1,)
+    selected_positions: _np.ndarray,
+    state_array: _np.ndarray,
+    state_bytes: _np.ndarray,
+    shape: tuple[int, ...] = (1,),
 ) -> _np.ndarray:
+    """
+    Draw standard-normal samples for a subset of rows of *state_array*.
+
+    Parameters
+    ----------
+    selected_positions : np.ndarray
+        1-D integer array whose values are row indices into *state_array*.
+        Only the indicated rows are advanced and sampled.
+    state_array : np.ndarray
+        2-D ``uint64`` array of shape ``(n_agents, ≥4)`` where each row holds
+        the PCG64 state for one agent.  Mutated in-place for the selected rows.
+    state_bytes : np.ndarray
+        Byte view (``uint8``) of the shared ``_BIT_GENERATOR`` state buffer.
+    shape : tuple of int, optional
+        Trailing dimensions of the per-agent sample block.  The total number
+        of samples per selected agent equals ``prod(shape)``.  Defaults to
+        ``(1,)``.
+
+    Returns
+    -------
+    np.ndarray
+        2-D ``float64`` array of shape ``(len(selected_positions), prod(shape))``.
+        Callers that want the trailing dimensions split out should call
+        ``.reshape(len(selected_positions), *shape)`` on the result.
+    """
     # compute the size for the unfolded (flat) trailing dimension.
     flat_size = 1
     for s in shape:
@@ -1487,8 +1568,32 @@ def _selected_vector_random_standard_normal(
 
 
 def vector_random_standard_normal(
-    state_array, selected_positions=None, shape: int | tuple[int, ...] = (1,)
+    state_array: _np.ndarray,
+    selected_positions: _np.ndarray | None = None,
+    shape: int | tuple[int, ...] = (1,),
 ) -> _np.ndarray:
+    """
+    Draw standard-normal samples for agents, optionally restricted to a subset.
+
+    Parameters
+    ----------
+    state_array : np.ndarray
+        2-D ``uint64`` array of shape ``(n_agents, ≥4)`` where each row holds
+        the PCG64 state for one agent.  Mutated in-place.
+    selected_positions : np.ndarray or None, optional
+        1-D integer array of row indices into *state_array*.  When provided,
+        only these agents are sampled; otherwise all agents are sampled.
+    shape : int or tuple of int, optional
+        Shape of the per-agent sample block.  A plain ``int`` is treated as a
+        1-element tuple, e.g. ``3`` → ``(3,)``.  Defaults to ``(1,)``.
+
+    Returns
+    -------
+    np.ndarray
+        ``float64`` array of shape
+        ``(n_selected, *shape)`` when *selected_positions* is given, or
+        ``(n_agents, *shape)`` otherwise.
+    """
     global _state_bytes
     if isinstance(shape, int):
         shape = (shape,)
@@ -1508,18 +1613,15 @@ def vector_random_standard_normal(
 @_nb.njit
 def _single_random_standard_uniform() -> float:
     """
-    Return a random float from the "standard uniform" distribution.
+    Return one sample from the standard uniform distribution U[0, 1).
 
-    Parameters
-    ----------
-    state_array
-    state_bytes
+    Uses the module-level PCG64 bit-generator directly via its CFFI pointer
+    (``_state_address``).  Advances the global RNG state in-place.
 
     Returns
     -------
-    out : float
-        Drawn from the standard uniform distribution.
-
+    float
+        A single draw from U[0, 1).
     """
 
     # write into the BIT_GENERATOR's state from the given state_array
@@ -1528,21 +1630,33 @@ def _single_random_standard_uniform() -> float:
 
 @_nb.njit
 def _several_random_standard_uniform(
-    state_array, state_bytes, size: int = 1
+    state_array: _np.ndarray,
+    state_bytes: _np.ndarray,
+    size: int = 1,
 ) -> _np.ndarray:
     """
-    Return a random float from the "standard uniform" distribution.
+    Draw ``size`` standard-uniform samples for a single RNG state row.
+
+    Loads the RNG state from *state_array* into the shared bit-generator,
+    fills a 1-D array of length *size* with U[0, 1) samples, then writes the
+    updated state back to *state_array*.
 
     Parameters
     ----------
-    state_array
-    state_bytes
+    state_array : np.ndarray
+        1-D ``uint64`` array of length ≥ 4 holding the PCG64 state for one
+        agent/row.  Mutated in-place with the post-draw state.
+    state_bytes : np.ndarray
+        Byte view (``uint8``) of the shared ``_BIT_GENERATOR`` state buffer.
+        Used as the staging area when injecting and extracting PCG64 state.
+    size : int, optional
+        Number of samples to draw.  Defaults to 1.
 
     Returns
     -------
-    out : float
-        Drawn from the standard uniform distribution.
-
+    np.ndarray
+        1-D ``float64`` array of shape ``(size,)`` containing draws from
+        U[0, 1).
     """
 
     # write into the BIT_GENERATOR's state from the given state_array
@@ -1560,8 +1674,31 @@ def _several_random_standard_uniform(
 
 @_nb.njit
 def _vector_random_standard_uniform(
-    state_array, state_bytes, shape: tuple[int, ...] = (1,)
+    state_array: _np.ndarray,
+    state_bytes: _np.ndarray,
+    shape: tuple[int, ...] = (1,),
 ) -> _np.ndarray:
+    """
+    Draw standard-uniform samples for every row of *state_array*.
+
+    Parameters
+    ----------
+    state_array : np.ndarray
+        2-D ``uint64`` array of shape ``(n_agents, ≥4)`` where each row holds
+        the PCG64 state for one agent.  Mutated in-place.
+    state_bytes : np.ndarray
+        Byte view (``uint8``) of the shared ``_BIT_GENERATOR`` state buffer.
+    shape : tuple of int, optional
+        Trailing dimensions of the per-agent sample block.  The total number
+        of samples per agent equals ``prod(shape)``.  Defaults to ``(1,)``.
+
+    Returns
+    -------
+    np.ndarray
+        2-D ``float64`` array of shape ``(n_agents, prod(shape))``.  Callers
+        that want trailing dimensions split out should call
+        ``.reshape(n_agents, *shape)`` on the result.
+    """
     # compute the size for the unfolded (flat) trailing dimension.
     flat_size = 1
     for s in shape:
@@ -1577,8 +1714,36 @@ def _vector_random_standard_uniform(
 
 @_nb.njit
 def _selected_vector_random_standard_uniform(
-    selected_positions, state_array, state_bytes, shape: tuple[int, ...] = (1,)
+    selected_positions: _np.ndarray,
+    state_array: _np.ndarray,
+    state_bytes: _np.ndarray,
+    shape: tuple[int, ...] = (1,),
 ) -> _np.ndarray:
+    """
+    Draw standard-uniform samples for a subset of rows of *state_array*.
+
+    Parameters
+    ----------
+    selected_positions : np.ndarray
+        1-D integer array whose values are row indices into *state_array*.
+        Only the indicated rows are advanced and sampled.
+    state_array : np.ndarray
+        2-D ``uint64`` array of shape ``(n_agents, ≥4)`` where each row holds
+        the PCG64 state for one agent.  Mutated in-place for the selected rows.
+    state_bytes : np.ndarray
+        Byte view (``uint8``) of the shared ``_BIT_GENERATOR`` state buffer.
+    shape : tuple of int, optional
+        Trailing dimensions of the per-agent sample block.  The total number
+        of samples per selected agent equals ``prod(shape)``.  Defaults to
+        ``(1,)``.
+
+    Returns
+    -------
+    np.ndarray
+        2-D ``float64`` array of shape ``(len(selected_positions), prod(shape))``.
+        Callers that want the trailing dimensions split out should call
+        ``.reshape(len(selected_positions), *shape)`` on the result.
+    """
     # compute the size for the unfolded (flat) trailing dimension.
     flat_size = 1
     for s in shape:
@@ -1593,8 +1758,33 @@ def _selected_vector_random_standard_uniform(
 
 
 def vector_random_standard_uniform(
-    state_array, selected_positions=None, shape: int | tuple[int, ...] = 1
+    state_array: _np.ndarray,
+    selected_positions: _np.ndarray | None = None,
+    shape: int | tuple[int, ...] = 1,
 ) -> _np.ndarray:
+    """
+    Draw standard-uniform samples for agents, optionally restricted to a subset.
+
+    Parameters
+    ----------
+    state_array : np.ndarray
+        2-D ``uint64`` array of shape ``(n_agents, ≥4)`` where each row holds
+        the PCG64 state for one agent.  Mutated in-place.
+    selected_positions : np.ndarray or None, optional
+        1-D integer array of row indices into *state_array*.  When provided,
+        only these agents are sampled; otherwise all agents are sampled.
+    shape : int or tuple of int, optional
+        Shape of the per-agent sample block.  A plain ``int`` is treated as a
+        1-element tuple, e.g. ``3`` → ``(3,)``.  Defaults to ``1``, i.e. one
+        scalar draw per agent.
+
+    Returns
+    -------
+    np.ndarray
+        ``float64`` array of shape
+        ``(n_selected, *shape)`` when *selected_positions* is given, or
+        ``(n_agents, *shape)`` otherwise; values drawn from U[0, 1).
+    """
     global _state_bytes
     if isinstance(shape, int):
         shape = (shape,)
