@@ -148,6 +148,83 @@ class FastChannel:
             self._state_array, selected_positions=selected_positions, shape=n
         )
 
+    def choice_for_df(self, df, step_name, a, size, replace):
+        """
+        Apply numpy.random.choice once for each row in df
+        using the appropriate random channel for each row.
+
+        Concatenate the the choice arrays for every row into a single 1-D ndarray
+        The resulting array will be of length: size * len(df.index)
+        This method is designed to support creation of a interaction_dataset
+
+        The columns in df are ignored; the index name and values are used to determine
+        which random number sequence to to use.
+
+        Parameters
+        ----------
+        df : pandas.DataFrame
+            df with index name and values corresponding to a registered channel
+        step_name : str
+            current step name so we can update row_states seed info
+        a : 1-D array-like or int
+            If an ndarray, a random sample is generated from its elements.
+            If an int, the random sample is generated as if a was np.arange(a).
+        size : int or tuple of ints
+            Output shape (per df row).
+        replace : bool
+            Whether the sample is with or without replacement.
+
+        Returns
+        -------
+        choices : 1-D ndarray of length: prod(size) * len(df.index)
+            The generated random samples for each row concatenated into a
+            single (flat) array.
+        """
+        assert step_name is not None
+        assert step_name == self.step_name
+        selected_positions = self._check_valid_df(df)
+
+        # total number of draws required per row
+        if isinstance(size, (int, np.integer)):
+            total = int(size)
+        else:
+            total = int(np.prod(size))
+
+        # population to sample from
+        if isinstance(a, (int, np.integer)):
+            a_arr = np.arange(int(a))
+        else:
+            a_arr = np.asarray(a)
+        n_pop = len(a_arr)
+
+        if replace:
+            # draw `total` uniforms per selected row and map to indices in a
+            rands = vector_random_standard_uniform(
+                self._state_array,
+                selected_positions=selected_positions,
+                shape=total,
+            )
+            idx = (rands * n_pop).astype(np.int64)
+            # guard against the (vanishingly rare) case rands == 1.0 - epsilon edge
+            np.minimum(idx, n_pop - 1, out=idx)
+            sample = a_arr[idx].reshape(-1)
+        else:
+            if total > n_pop:
+                raise ValueError(
+                    "Cannot take a larger sample than population when 'replace=False'"
+                )
+            # draw n_pop uniforms per selected row; argsort produces a random
+            # permutation of [0, n_pop), and we take the first `total` entries.
+            rands = vector_random_standard_uniform(
+                self._state_array,
+                selected_positions=selected_positions,
+                shape=n_pop,
+            )
+            order = np.argsort(rands, axis=1)[:, :total]
+            sample = a_arr[order].reshape(-1)
+
+        return sample
+
 
 class SimpleChannel(object):
     """
