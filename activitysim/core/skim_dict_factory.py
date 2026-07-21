@@ -68,7 +68,7 @@ class SkimInfo(object):
         skim_data_shape:    3D tuple        (num_skims, omx_shape[0], omx_shape[1]) if ROW_MAJOR_LAYOUT
         offset_map:         dict or None    1D ndarray as returned by omx_file.mapentries, if omx file has
                                             mappings, or the (sorted) zone ids found in a parquet skim file
-        offset_map_name:    str             name of offset_map in omx_filecorresponding to offset_map, if there was one
+        offset_map_name:    str             name of offset_map in omx_file corresponding to offset_map, if there was one
         omx_keys:       dict            dict mapping skim key (str or tuple) to skim key in omx file
                                             {DISTWALK: DISTWALK,
                                             ('DRV_COM_WLK_BOARDS', 'AM'): DRV_COM_WLK_BOARDS__AM, ...}
