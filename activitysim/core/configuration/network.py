@@ -125,6 +125,18 @@ class TAZ_Settings(PydanticBase):
 
     This is treated as a fallback for the raw input data, if ZARR format data
     is not available.
+
+    As an alternative to OMX, skim files can instead be provided in Parquet
+    format (using a ``.parquet`` file extension). The input format is
+    auto-detected from the file extension, so no other settings need to
+    change to use Parquet input. Parquet skim files should have an origin
+    column and a destination column (the first two columns in the file),
+    followed by one column for each named skim matrix (matching the naming
+    conventions used for OMX skims, including double-underscore delimited
+    time periods). Parquet skim data may be dense (one row for every
+    origin-destination combination, sorted in row-major or column-major
+    order) or sparse (only some origin-destination combinations present, in
+    any order).
     """
 
     zarr: str = None
