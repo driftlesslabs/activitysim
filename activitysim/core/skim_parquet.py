@@ -106,10 +106,9 @@ class ParquetSkimFile:
         ):
             return ROW_MAJOR
 
-        col_major_orig = np.tile(np.arange(n), n)
-        col_major_dest = np.repeat(np.arange(n), n)
-        if np.array_equal(orig_idx, col_major_orig) and np.array_equal(
-            dest_idx, col_major_dest
+        # col-major orig/dest patterns are the same as row-major dest/orig
+        if np.array_equal(orig_idx, row_major_dest) and np.array_equal(
+            dest_idx, row_major_orig
         ):
             return COL_MAJOR
 
