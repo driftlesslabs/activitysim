@@ -64,8 +64,8 @@ class ParquetSkimFile:
         self.data_cols = column_names[2:]
 
         od_table = parquet_file.read(columns=[self.orig_col, self.dest_col])
-        origins = od_table.column(self.orig_col).to_numpy(zero_copy_only=False)
-        destinations = od_table.column(self.dest_col).to_numpy(zero_copy_only=False)
+        origins = od_table[self.orig_col].to_numpy(zero_copy_only=False)
+        destinations = od_table[self.dest_col].to_numpy(zero_copy_only=False)
 
         zone_ids = np.unique(np.concatenate([origins, destinations]))
         self.zone_ids = zone_ids
@@ -76,13 +76,8 @@ class ParquetSkimFile:
         n_rows = len(origins)
         self.is_dense = n_rows == self.n_zones * self.n_zones
 
-        zone_index = {z: i for i, z in enumerate(zone_ids)}
-        orig_idx = np.fromiter(
-            (zone_index[o] for o in origins), dtype=np.int64, count=n_rows
-        )
-        dest_idx = np.fromiter(
-            (zone_index[d] for d in destinations), dtype=np.int64, count=n_rows
-        )
+        orig_idx = np.searchsorted(zone_ids, origins)
+        dest_idx = np.searchsorted(zone_ids, destinations)
         self._orig_idx = orig_idx
         self._dest_idx = dest_idx
 
@@ -134,7 +129,7 @@ class ParquetSkimFile:
         np.ndarray, shape (n_zones, n_zones)
         """
         table = pq.read_table(self.file_path, columns=[column_name])
-        values = table.column(column_name).to_numpy(zero_copy_only=False)
+        values = table[column_name].to_numpy(zero_copy_only=False)
         if dtype is not None:
             values = values.astype(dtype, copy=False)
 

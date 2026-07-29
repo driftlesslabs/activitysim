@@ -387,6 +387,7 @@ class AbstractSkimFactory(ABC):
                 parquet_skim_file = skim_info.parquet_files.get(omx_file_path)
                 if parquet_skim_file is None:
                     parquet_skim_file = ParquetSkimFile(omx_file_path)
+                    skim_info.parquet_files[omx_file_path] = parquet_skim_file
                 for skim_key, omx_key in omx_keys.items():
                     if omx_manifest[omx_key] == omx_file_path:
                         offset = skim_info.block_offsets[skim_key]

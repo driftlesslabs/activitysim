@@ -127,7 +127,7 @@ class TAZ_Settings(PydanticBase):
     is not available.
 
     As an alternative to OMX, skim files can instead be provided in Parquet
-    format (using a ``.parquet`` file extension). The input format is
+    format (using a ``.parquet`` or ``.pq`` file extension). The input format is
     auto-detected from the file extension, so no other settings need to
     change to use Parquet input. Parquet skim files should have an origin
     column and a destination column (the first two columns in the file),
