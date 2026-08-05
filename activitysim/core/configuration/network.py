@@ -136,7 +136,8 @@ class TAZ_Settings(PydanticBase):
     time periods). Parquet skim data may be dense (one row for every
     origin-destination combination, sorted in row-major or column-major
     order) or sparse (only some origin-destination combinations present, in
-    any order).
+    any order). Parquet inputs are supported by both the legacy skim-dictionary
+    loaders and Sharrow when Sharrow 2.16 or newer is installed.
     """
 
     zarr: str = None
@@ -231,10 +232,11 @@ class NetworkSettings(PydanticReadable, extra="forbid"):
     """Instructions for how to load and pre-process skim matrices.
 
     If given as a string or a list of strings, it is interpreted as the location
-    for OMX file(s), either as a single file or as a glob-matching pattern for
-    multiple files. The time period for the matrix must be represented at the end
-    of the matrix name and be seperated by a double_underscore (e.g. `BUS_IVT__AM`
-    indicates base skim BUS_IVT with a time period of AM.
+    for OMX or Parquet skim file(s), either as a single file or as a glob-matching
+    pattern for multiple files. Formats are detected from each file's extension
+    and may be mixed. The time period for the matrix must be represented at the
+    end of the matrix name and be separated by a double underscore (e.g.
+    `BUS_IVT__AM` indicates base skim BUS_IVT with a time period of AM).
 
     Alternatively, this can be given as a nested dictionary defined via the
     TAZ_Settings class, which allows for ZARR transformation and pre-processing.

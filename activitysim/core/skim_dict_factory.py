@@ -203,13 +203,14 @@ class SkimInfo(object):
                 # mapping, although it can appear multiple times (e.g. once in
                 # each file).
                 for m in omx_file.listMappings():
+                    omx_zone_ids = np.asarray(omx_file.mapentries(m))
                     if self.offset_map is None:
                         self.offset_map_name = m
-                        self.offset_map = omx_file.mapentries(self.offset_map_name)
+                        self.offset_map = omx_zone_ids
                         assert len(self.offset_map) == self.omx_shape[0]
                     else:
                         # don't really expect more than one, but ok if they are all the same
-                        if not (self.offset_map == omx_file.mapentries(m)):
+                        if not np.array_equal(self.offset_map, omx_zone_ids):
                             raise RuntimeError(
                                 f"Multiple mappings in omx file: {self.offset_map_name} != {m}"
                             )

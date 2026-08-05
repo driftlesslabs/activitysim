@@ -74,17 +74,23 @@ class ParquetSkimFile:
         self.shape = (self.n_zones, self.n_zones)
 
         n_rows = len(origins)
+        if n_rows == 0:
+            raise ValueError(f"parquet skim file {file_path} contains no rows")
         self.is_dense = n_rows == self.n_zones * self.n_zones
 
         orig_idx = np.searchsorted(zone_ids, origins)
         dest_idx = np.searchsorted(zone_ids, destinations)
-        self._orig_idx = orig_idx
-        self._dest_idx = dest_idx
 
         if self.is_dense:
             self.layout = self._detect_dense_layout(orig_idx, dest_idx)
+            # Dense reads only need the layout. Retaining two n^2 index arrays
+            # for the lifetime of every skim file can consume gigabytes.
+            self._orig_idx = None
+            self._dest_idx = None
         else:
             self.layout = SPARSE
+            self._orig_idx = orig_idx
+            self._dest_idx = dest_idx
 
     def _detect_dense_layout(self, orig_idx, dest_idx):
         """
@@ -94,16 +100,26 @@ class ParquetSkimFile:
         """
         n = self.n_zones
 
-        row_major_orig = np.repeat(np.arange(n), n)
-        row_major_dest = np.tile(np.arange(n), n)
-        if np.array_equal(orig_idx, row_major_orig) and np.array_equal(
-            dest_idx, row_major_dest
+        expected = np.arange(n)
+        orig_2d = orig_idx.reshape(n, n)
+        dest_2d = dest_idx.reshape(n, n)
+
+        # Check the repeated/tiled patterns using reductions that allocate
+        # O(n) temporary arrays instead of two additional O(n^2) arrays.
+        if (
+            np.array_equal(orig_2d[:, 0], expected)
+            and np.all(np.ptp(orig_2d, axis=1) == 0)
+            and np.array_equal(dest_2d[0, :], expected)
+            and np.all(np.ptp(dest_2d, axis=0) == 0)
         ):
             return ROW_MAJOR
 
         # col-major orig/dest patterns are the same as row-major dest/orig
-        if np.array_equal(orig_idx, row_major_dest) and np.array_equal(
-            dest_idx, row_major_orig
+        if (
+            np.array_equal(orig_2d[0, :], expected)
+            and np.all(np.ptp(orig_2d, axis=0) == 0)
+            and np.array_equal(dest_2d[:, 0], expected)
+            and np.all(np.ptp(dest_2d, axis=1) == 0)
         ):
             return COL_MAJOR
 

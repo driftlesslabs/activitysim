@@ -18,6 +18,7 @@ from activitysim.core import config
 from activitysim.core import flow as __flow  # noqa: 401
 from activitysim.core import workflow
 from activitysim.core.input import read_input_file
+from activitysim.core.skim_parquet import ParquetSkimFile, is_parquet_file
 
 logger = logging.getLogger(__name__)
 
@@ -698,6 +699,107 @@ def load_sparse_maz_skims(
     return dataset
 
 
+def _load_skim_dataset_from_sources(
+    skim_file_paths,
+    *,
+    time_periods,
+    max_float_precision,
+    ignore,
+    parquet_file_metadata=None,
+):
+    """
+    Load OMX and/or Parquet skim files into one Sharrow-compatible Dataset.
+
+    Parquet index columns are identified from the first two columns in each
+    file, consistent with the legacy skim reader. Files with different index
+    column names are loaded in separate groups and aligned by their zone labels.
+
+    Returns
+    -------
+    dataset : xarray.Dataset
+    omx_file_handles : list
+        Open OMX handles retained for the optimized shared-memory reload path.
+    """
+    omx_file_paths = [f for f in skim_file_paths if not is_parquet_file(f)]
+    parquet_file_paths = [f for f in skim_file_paths if is_parquet_file(f)]
+    omx_file_handles = []
+    datasets = []
+
+    try:
+        if omx_file_paths:
+            omx_file_handles = [
+                openmatrix.open_file(f, mode="r") for f in omx_file_paths
+            ]
+            datasets.append(
+                sh.dataset.from_omx_3d(
+                    omx_file_handles,
+                    index_names=("otaz", "dtaz", "time_period"),
+                    time_periods=time_periods,
+                    max_float_precision=max_float_precision,
+                    ignore=ignore,
+                )
+            )
+
+        if parquet_file_paths:
+            if not hasattr(sh.dataset, "from_parquet_3d"):
+                raise ImportError(
+                    "Parquet skims with Sharrow require Sharrow 2.16 or newer"
+                )
+            metadata_by_path = {
+                os.fspath(path): metadata
+                for path, metadata in (parquet_file_metadata or {}).items()
+            }
+            parquet_groups = {}
+            for file_path in parquet_file_paths:
+                parquet_file = metadata_by_path.get(os.fspath(file_path))
+                if parquet_file is None:
+                    parquet_file = ParquetSkimFile(file_path)
+                index_columns = (parquet_file.orig_col, parquet_file.dest_col)
+                parquet_groups.setdefault(index_columns, []).append(file_path)
+
+            for (orig_col, dest_col), file_paths in parquet_groups.items():
+                parquet_dataset = sh.dataset.from_parquet_3d(
+                    file_paths,
+                    index_names=(orig_col, dest_col, "time_period"),
+                    time_periods=time_periods,
+                    max_float_precision=max_float_precision,
+                    ignore=ignore,
+                )
+
+                # Rename through temporary names so even swapped source names
+                # (e.g. dtaz/otaz) cannot collide during the rename.
+                parquet_dataset = parquet_dataset.rename(
+                    {
+                        orig_col: "__activitysim_parquet_origin__",
+                        dest_col: "__activitysim_parquet_destination__",
+                    }
+                ).rename(
+                    {
+                        "__activitysim_parquet_origin__": "otaz",
+                        "__activitysim_parquet_destination__": "dtaz",
+                    }
+                )
+                datasets.append(parquet_dataset)
+
+        if not datasets:
+            raise ValueError("no OMX or Parquet skim files were provided")
+        if len(datasets) == 1:
+            dataset = datasets[0]
+        else:
+            dataset = xr.merge(datasets, compat="no_conflicts", join="outer")
+
+        # SkimDataset expects this coordinate even when all source matrices are
+        # time-agnostic and therefore do not otherwise create the dimension.
+        if "time_period" not in dataset.coords:
+            dataset = dataset.assign_coords(time_period=time_periods)
+
+        return dataset, omx_file_handles
+    except Exception:
+        for handle in omx_file_handles:
+            handle.close()
+        raise
+
+
 def load_skim_dataset_to_shared_memory(state, skim_tag="taz") -> xr.Dataset:
     """
     Load skims from disk into shared memory.
@@ -718,11 +820,12 @@ def load_skim_dataset_to_shared_memory(state, skim_tag="taz") -> xr.Dataset:
     if network_los_preload is None:
         raise ValueError("missing network_los_preload")
 
-    # find which OMX files are to be used.
+    # Find the source skim files to use; formats may be mixed.
     omx_file_paths = state.filesystem.expand_input_file_list(
         network_los_preload.omx_file_names(skim_tag),
     )
     omx_file_handles = []
+    source_has_parquet = any(is_parquet_file(f) for f in omx_file_paths)
     zarr_file = network_los_preload.zarr_file_name(skim_tag)
 
     if state.settings.disable_zarr:
@@ -834,23 +937,22 @@ def load_skim_dataset_to_shared_memory(state, skim_tag="taz") -> xr.Dataset:
             d = sh.dataset.from_zarr_with_attr(zarr_file)
             zarr_write_time = d.attrs.get("ZARR_WRITE_TIME", 0)
             if zarr_write_time < latest_file_modification_time(omx_file_paths):
-                logger.warning("zarr skims older than omx, not using them")
+                logger.warning("zarr skims older than source skims, not using them")
                 do_not_save_zarr = True
                 d = None
             else:
                 d = d.max_float_precision(max_float_precision)
         if d is None:
             if zarr_file and not do_not_save_zarr:
-                logger.info("did not find zarr skims, loading omx")
-            omx_file_handles = [
-                openmatrix.open_file(f, mode="r") for f in omx_file_paths
-            ]
-            d = sh.dataset.from_omx_3d(
-                omx_file_handles,
-                index_names=("otaz", "dtaz", "time_period"),
+                logger.info("did not find zarr skims, loading source skim files")
+            d, omx_file_handles = _load_skim_dataset_from_sources(
+                omx_file_paths,
                 time_periods=time_periods,
                 max_float_precision=max_float_precision,
                 ignore=state.settings.omx_ignore_patterns,
+                parquet_file_metadata=network_los_preload.skims_info[
+                    skim_tag
+                ].parquet_files,
             )
 
             if zarr_file:
@@ -950,11 +1052,15 @@ def load_skim_dataset_to_shared_memory(state, skim_tag="taz") -> xr.Dataset:
         logger.info(
             "store_skims_in_shm is False, keeping skims in process-local memory"
         )
+        for f in omx_file_handles:
+            f.close()
         return d
     else:
         logger.info("writing skims to shared memory")
-        if dask_required:
-            # setting `load` to True uses dask to load the data into memory
+        if dask_required or source_has_parquet:
+            # Parquet-backed datasets cannot use reload_from_omx_3d, so copy
+            # their already-loaded data into shared memory. The same path is
+            # required when coordinate realignment created a dask graph.
             d_shared_mem = d.shm.to_shared_memory(backing, mode="r", load=True)
         else:
             # setting `load` to false then calling `reload_from_omx_3d` avoids
