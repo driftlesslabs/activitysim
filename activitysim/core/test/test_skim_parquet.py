@@ -135,9 +135,7 @@ def test_multiple_data_columns(tmp_path, zone_ids, values):
 
 def test_empty_parquet_raises(tmp_path):
     file_path = tmp_path / "empty.parquet"
-    pd.DataFrame(columns=["orig", "dest", "VALUE"]).to_parquet(
-        file_path, index=False
-    )
+    pd.DataFrame(columns=["orig", "dest", "VALUE"]).to_parquet(file_path, index=False)
 
     with pytest.raises(ValueError, match="contains no rows"):
         ParquetSkimFile(file_path)
@@ -179,9 +177,7 @@ def test_sharrow_parquet_sources(tmp_path, zone_ids, values):
     np.testing.assert_array_equal(dataset.dtaz, zone_ids)
     np.testing.assert_array_equal(dataset.DIST, values)
     np.testing.assert_array_equal(dataset.DISTBIKE, values)
-    np.testing.assert_array_equal(
-        dataset.TIME.sel(time_period="AM"), values * 2
-    )
+    np.testing.assert_array_equal(dataset.TIME.sel(time_period="AM"), values * 2)
     np.testing.assert_array_equal(
         dataset.TIME.sel(time_period="PM"), np.zeros_like(values)
     )
@@ -199,9 +195,7 @@ def test_sharrow_mixed_omx_parquet_sources():
     try:
         assert {"DIST", "DISTBIKE", "SOV_TIME"} <= set(dataset.data_vars)
         assert float(dataset.DIST.sel(otaz=5, dtaz=7)) == pytest.approx(0.4)
-        assert float(dataset.DISTBIKE.sel(otaz=23, dtaz=20)) == pytest.approx(
-            2.55
-        )
+        assert float(dataset.DISTBIKE.sel(otaz=23, dtaz=20)) == pytest.approx(2.55)
     finally:
         for handle in omx_handles:
             handle.close()
