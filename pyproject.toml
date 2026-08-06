@@ -157,6 +157,3 @@ dev = [
 
 [tool.uv]
 default-groups = ["dev"]
-
-[tool.uv.sources]
-sharrow = { git = "https://github.com/ActivitySim/sharrow.git", tag = "v2.16.0" }

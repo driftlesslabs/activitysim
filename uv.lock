@@ -122,7 +122,7 @@ requires-dist = [
     { name = "requests", specifier = ">=2.7" },
     { name = "scikit-learn", specifier = ">=1.2" },
     { name = "setuptools", specifier = ">=80.9.0" },
-    { name = "sharrow", git = "https://github.com/ActivitySim/sharrow.git?tag=v2.16.0" },
+    { name = "sharrow", specifier = ">=2.16.0" },
     { name = "sparse" },
     { name = "tables", specifier = ">=3.9" },
     { name = "xarray", specifier = ">=2024.5" },
@@ -5205,8 +5205,8 @@ wheels = [
 
 [[package]]
 name = "sharrow"
-version = "2.16.0"
-source = { git = "https://github.com/ActivitySim/sharrow.git?tag=v2.16.0#33f5d7dfc148b030d705c01cf2622addc27d598e" }
+version = "2.16.2"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "blosc2", version = "2.7.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "blosc2", version = "3.1.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
@@ -5224,6 +5224,10 @@ dependencies = [
     { name = "pandas", version = "2.3.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "pyarrow" },
     { name = "xarray" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/9a/8b/09ba6d4eb1d5b761b9e0258538073823a3bf4b303cacd4cb41d01946cfa4/sharrow-2.16.2.tar.gz", hash = "sha256:acac5b99cc08557575e61599ebb9f5c7aa15e9863b0b66cf871b3ecfaf559d03", size = 2368709, upload-time = "2026-08-05T21:17:32.58Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/da/fc/07c627b1237bae4b4c85b9671ae4db002c6c76c142d1a85e099fe05e506f/sharrow-2.16.2-py3-none-any.whl", hash = "sha256:b6a6ebb4849b1346003ca3b31147ba2fe823dc2aa32f90c371ad4c0e950600f3", size = 2251200, upload-time = "2026-08-05T21:17:31.253Z" },
 ]
 
 [[package]]
