@@ -18,7 +18,7 @@ from activitysim.core import config
 from activitysim.core import flow as __flow  # noqa: 401
 from activitysim.core import workflow
 from activitysim.core.input import read_input_file
-from activitysim.core.skim_parquet import ParquetSkimFile, is_parquet_file
+from activitysim.core.skim_parquet import SPARSE, ParquetSkimFile, is_parquet_file
 
 logger = logging.getLogger(__name__)
 
@@ -699,6 +699,92 @@ def load_sparse_maz_skims(
     return dataset
 
 
+def _matrix_time_periods(matrix_names, ignore):
+    """Collect the time-period pages physically present in a source group."""
+    if isinstance(ignore, str):
+        ignore = [ignore]
+
+    available_periods = {}
+    for matrix_name in matrix_names:
+        if ignore and any(re.match(pattern, matrix_name) for pattern in ignore):
+            continue
+        base_name, separator, period_name = matrix_name.partition("__")
+        if separator:
+            available_periods.setdefault(base_name, set()).add(period_name)
+    return available_periods
+
+
+def _mask_synthetic_time_periods(dataset, available_periods):
+    """Replace loader-created zero pages with missing values before merging."""
+
+    for base_name, periods in available_periods.items():
+        if base_name not in dataset or "time_period" not in dataset[base_name].dims:
+            continue
+        if not set(dataset.time_period.values).issubset(periods):
+            dataset[base_name] = dataset[base_name].where(
+                dataset.time_period.isin(list(periods))
+            )
+    return dataset
+
+
+def _restore_synthetic_time_periods(dataset, available_periods):
+    """Restore zero pages for periods absent from every physical source."""
+    for base_name, periods in available_periods.items():
+        if base_name not in dataset or "time_period" not in dataset[base_name].dims:
+            continue
+        if not set(dataset.time_period.values).issubset(periods):
+            dataset[base_name] = dataset[base_name].where(
+                dataset.time_period.isin(list(periods)), 0
+            )
+    return dataset
+
+
+def _zero_fill_sparse_parquet(dataset, parquet_sources, ignore):
+    """Match the legacy loader's zero fill for absent sparse OD pairs."""
+    if isinstance(ignore, str):
+        ignore = [ignore]
+
+    # Sharrow's duplicate-column behavior is last-file-wins, so use the same
+    # source when selecting the OD pairs that are physically present.
+    matrix_sources = {}
+    for _, parquet_file in parquet_sources:
+        for matrix_name in parquet_file.data_cols:
+            if ignore and any(re.match(pattern, matrix_name) for pattern in ignore):
+                continue
+            matrix_sources[matrix_name] = parquet_file
+
+    presence_by_file = {}
+    for matrix_name, parquet_file in matrix_sources.items():
+        if parquet_file.layout != SPARSE:
+            continue
+
+        presence = presence_by_file.get(parquet_file)
+        if presence is None:
+            presence = np.zeros(parquet_file.shape, dtype=bool)
+            presence[parquet_file._orig_idx, parquet_file._dest_idx] = True
+            presence = xr.DataArray(
+                presence,
+                dims=("otaz", "dtaz"),
+                coords={
+                    "otaz": parquet_file.zone_ids,
+                    "dtaz": parquet_file.zone_ids,
+                },
+            )
+            presence_by_file[parquet_file] = presence
+
+        base_name, separator, period_name = matrix_name.partition("__")
+        if separator:
+            if base_name not in dataset:
+                continue
+            # Preserve explicit NaNs at present OD pairs and other periods;
+            # only combinations absent from this physical page become zero.
+            keep_value = presence | (dataset.time_period != period_name)
+            dataset[base_name] = dataset[base_name].where(keep_value, 0)
+        elif matrix_name in dataset:
+            dataset[matrix_name] = dataset[matrix_name].where(presence, 0)
+    return dataset
+
+
 def _load_skim_dataset_from_sources(
     skim_file_paths,
     *,
@@ -730,15 +816,19 @@ def _load_skim_dataset_from_sources(
             omx_file_handles = [
                 openmatrix.open_file(f, mode="r") for f in omx_file_paths
             ]
-            datasets.append(
-                sh.dataset.from_omx_3d(
-                    omx_file_handles,
-                    index_names=("otaz", "dtaz", "time_period"),
-                    time_periods=time_periods,
-                    max_float_precision=max_float_precision,
-                    ignore=ignore,
-                )
+            omx_dataset = sh.dataset.from_omx_3d(
+                omx_file_handles,
+                index_names=("otaz", "dtaz", "time_period"),
+                time_periods=time_periods,
+                max_float_precision=max_float_precision,
+                ignore=ignore,
             )
+            omx_matrix_names = [
+                matrix_name
+                for handle in omx_file_handles
+                for matrix_name in handle.listMatrices()
+            ]
+            datasets.append((omx_dataset, omx_matrix_names))
 
         if parquet_file_paths:
             if not hasattr(sh.dataset, "from_parquet_3d"):
@@ -754,10 +844,22 @@ def _load_skim_dataset_from_sources(
                 parquet_file = metadata_by_path.get(os.fspath(file_path))
                 if parquet_file is None:
                     parquet_file = ParquetSkimFile(file_path)
-                index_columns = (parquet_file.orig_col, parquet_file.dest_col)
-                parquet_groups.setdefault(index_columns, []).append(file_path)
+                # Load sparse files independently. Sharrow derives each sparse
+                # axis only from labels present on that axis, so grouping a
+                # sparse file that omits an entire origin or destination can
+                # otherwise discard valid rows from another file in the group.
+                sparse_source = file_path if parquet_file.layout == SPARSE else None
+                group_key = (
+                    parquet_file.orig_col,
+                    parquet_file.dest_col,
+                    sparse_source,
+                )
+                parquet_groups.setdefault(group_key, []).append(
+                    (file_path, parquet_file)
+                )
 
-            for (orig_col, dest_col), file_paths in parquet_groups.items():
+            for (orig_col, dest_col, _), parquet_sources in parquet_groups.items():
+                file_paths = [source[0] for source in parquet_sources]
                 parquet_dataset = sh.dataset.from_parquet_3d(
                     file_paths,
                     index_names=(orig_col, dest_col, "time_period"),
@@ -779,14 +881,40 @@ def _load_skim_dataset_from_sources(
                         "__activitysim_parquet_destination__": "dtaz",
                     }
                 )
-                datasets.append(parquet_dataset)
+                # Sparse xarray expansion can omit an entire coordinate when no
+                # row uses it. Normalize both dimensions to the full zone set,
+                # which also gives dense nonascending inputs legacy-compatible
+                # canonical ordering.
+                parquet_zone_ids = parquet_sources[0][1].zone_ids
+                parquet_dataset = parquet_dataset.reindex(
+                    otaz=parquet_zone_ids, dtaz=parquet_zone_ids
+                )
+                parquet_dataset = _zero_fill_sparse_parquet(
+                    parquet_dataset, parquet_sources, ignore
+                )
+                parquet_matrix_names = [
+                    matrix_name
+                    for _, parquet_file in parquet_sources
+                    for matrix_name in parquet_file.data_cols
+                ]
+                datasets.append((parquet_dataset, parquet_matrix_names))
 
         if not datasets:
             raise ValueError("no OMX or Parquet skim files were provided")
         if len(datasets) == 1:
-            dataset = datasets[0]
+            dataset = datasets[0][0]
         else:
-            dataset = xr.merge(datasets, compat="no_conflicts", join="outer")
+            all_available_periods = {}
+            masked_datasets = []
+            for source_dataset, matrix_names in datasets:
+                source_periods = _matrix_time_periods(matrix_names, ignore)
+                for base_name, periods in source_periods.items():
+                    all_available_periods.setdefault(base_name, set()).update(periods)
+                masked_datasets.append(
+                    _mask_synthetic_time_periods(source_dataset, source_periods)
+                )
+            dataset = xr.merge(masked_datasets, compat="no_conflicts", join="outer")
+            dataset = _restore_synthetic_time_periods(dataset, all_available_periods)
 
         # SkimDataset expects this coordinate even when all source matrices are
         # time-agnostic and therefore do not otherwise create the dimension.

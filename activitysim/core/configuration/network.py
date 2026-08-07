@@ -134,10 +134,11 @@ class TAZ_Settings(PydanticBase):
     followed by one column for each named skim matrix (matching the naming
     conventions used for OMX skims, including double-underscore delimited
     time periods). Parquet skim data may be dense (one row for every
-    origin-destination combination, sorted in row-major or column-major
-    order) or sparse (only some origin-destination combinations present, in
-    any order). Parquet inputs are supported by both the legacy skim-dictionary
-    loaders and Sharrow when Sharrow 2.16 or newer is installed.
+    origin-destination combination, sorted in row-major or column-major order
+    using any stable zone-ID order) or sparse (only some origin-destination
+    combinations present, in any order). Parquet inputs are supported by both
+    the legacy skim-dictionary loaders and Sharrow when Sharrow 2.16 or newer
+    is installed.
     """
 
     zarr: str = None

@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import numpy as np
+import openmatrix
 import pandas as pd
 import pytest
 
@@ -86,6 +87,33 @@ def test_col_major_dense(tmp_path, zone_ids, values):
     np.testing.assert_array_equal(matrix, values)
 
 
+@pytest.mark.parametrize(
+    "dataframe_factory,expected_layout",
+    [
+        (_dense_row_major_df, ROW_MAJOR),
+        (_dense_col_major_df, COL_MAJOR),
+    ],
+)
+def test_dense_nonascending_zone_order(
+    tmp_path, values, dataframe_factory, expected_layout
+):
+    source_zone_ids = np.array([30, 10, 40, 20])
+    df = dataframe_factory(source_zone_ids, values)
+    file_path = tmp_path / "skims.parquet"
+    df.to_parquet(file_path, index=False)
+
+    skim_file = ParquetSkimFile(file_path)
+    assert skim_file.layout == expected_layout
+
+    # The legacy loader uses one zone mapping for both dimensions, so dense
+    # source order is normalized to the canonical ascending zone mapping.
+    order = np.argsort(source_zone_ids)
+    np.testing.assert_array_equal(skim_file.zone_ids, source_zone_ids[order])
+    np.testing.assert_array_equal(
+        skim_file.read_matrix("VALUE"), values[order][:, order]
+    )
+
+
 def test_sparse_unsorted(tmp_path, zone_ids, values):
     # omit one od pair, and shuffle the rows, to force sparse handling
     df = _dense_row_major_df(zone_ids, values)
@@ -104,6 +132,55 @@ def test_sparse_unsorted(tmp_path, zone_ids, values):
     dropped_orig_idx, dropped_dest_idx = 1, 1
     expected[dropped_orig_idx, dropped_dest_idx] = 0
     np.testing.assert_array_equal(matrix, expected)
+
+
+def test_sharrow_sparse_parquet_fills_missing_pairs_with_zero(
+    tmp_path, zone_ids, values
+):
+    df = _dense_row_major_df(zone_ids, values).drop(index=range(4, 8))
+    df.loc[1, "VALUE"] = np.nan
+    file_path = tmp_path / "sparse.parquet"
+    df.to_parquet(file_path, index=False)
+
+    dataset, omx_handles = _load_skim_dataset_from_sources(
+        [file_path],
+        time_periods=["AM", "PM"],
+        max_float_precision=32,
+        ignore=None,
+    )
+
+    assert omx_handles == []
+    expected = values.copy()
+    expected[1, :] = 0
+    expected[0, 1] = np.nan
+    np.testing.assert_array_equal(dataset.otaz, zone_ids)
+    np.testing.assert_array_equal(dataset.dtaz, zone_ids)
+    np.testing.assert_array_equal(dataset.VALUE, expected)
+
+
+def test_sharrow_sparse_file_does_not_truncate_dense_file(tmp_path, zone_ids, values):
+    sparse = _dense_row_major_df(zone_ids, values).drop(index=range(4, 8))
+    sparse_path = tmp_path / "sparse.parquet"
+    sparse.to_parquet(sparse_path, index=False)
+
+    dense = _dense_row_major_df(zone_ids, values * 10).rename(
+        columns={"VALUE": "VALUE2"}
+    )
+    dense_path = tmp_path / "dense.parquet"
+    dense.to_parquet(dense_path, index=False)
+
+    dataset, omx_handles = _load_skim_dataset_from_sources(
+        [sparse_path, dense_path],
+        time_periods=["AM", "PM"],
+        max_float_precision=32,
+        ignore=None,
+    )
+
+    assert omx_handles == []
+    expected_sparse = values.copy()
+    expected_sparse[1, :] = 0
+    np.testing.assert_array_equal(dataset.VALUE, expected_sparse)
+    np.testing.assert_array_equal(dataset.VALUE2, values * 10)
 
 
 def test_dense_unsorted_raises(tmp_path, zone_ids, values):
@@ -196,6 +273,33 @@ def test_sharrow_mixed_omx_parquet_sources():
         assert {"DIST", "DISTBIKE", "SOV_TIME"} <= set(dataset.data_vars)
         assert float(dataset.DIST.sel(otaz=5, dtaz=7)) == pytest.approx(0.4)
         assert float(dataset.DISTBIKE.sel(otaz=23, dtaz=20)) == pytest.approx(2.55)
+    finally:
+        for handle in omx_handles:
+            handle.close()
+
+
+def test_sharrow_mixed_sources_split_time_periods(tmp_path, zone_ids, values):
+    omx_path = tmp_path / "am.omx"
+    with openmatrix.open_file(omx_path, mode="w") as omx_file:
+        omx_file["TIME__AM"] = values * 2
+        omx_file.create_mapping("zone_number", zone_ids)
+
+    parquet = _dense_row_major_df(zone_ids, values * 3).rename(
+        columns={"VALUE": "TIME__PM"}
+    )
+    parquet_path = tmp_path / "pm.parquet"
+    parquet.to_parquet(parquet_path, index=False)
+
+    dataset, omx_handles = _load_skim_dataset_from_sources(
+        [omx_path, parquet_path],
+        time_periods=["AM", "PM"],
+        max_float_precision=32,
+        ignore=None,
+    )
+
+    try:
+        np.testing.assert_array_equal(dataset.TIME.sel(time_period="AM"), values * 2)
+        np.testing.assert_array_equal(dataset.TIME.sel(time_period="PM"), values * 3)
     finally:
         for handle in omx_handles:
             handle.close()

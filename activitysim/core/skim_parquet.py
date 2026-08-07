@@ -43,8 +43,9 @@ class ParquetSkimFile:
     origin/destination values are used to determine the (square) shape of the
     matrices, and whether the data is arranged 'densely' (i.e. every combination
     of origin and destination is present exactly once) in row-major or column-major
-    order, or is instead 'sparse' (i.e. not every combination is present, or the
-    dense data is not sorted in row-major or column-major order).
+    order using any stable zone-ID order, or is instead 'sparse' (i.e. not every
+    combination is present, or the dense data is not sorted in row-major or
+    column-major order).
     """
 
     def __init__(self, file_path):
@@ -82,21 +83,29 @@ class ParquetSkimFile:
         dest_idx = np.searchsorted(zone_ids, destinations)
 
         if self.is_dense:
-            self.layout = self._detect_dense_layout(orig_idx, dest_idx)
+            self.layout, source_order = self._detect_dense_layout(orig_idx, dest_idx)
+            canonical_order = np.argsort(source_order)
+            if np.array_equal(canonical_order, np.arange(self.n_zones)):
+                canonical_order = None
+            self._dense_reindex = canonical_order
             # Dense reads only need the layout. Retaining two n^2 index arrays
             # for the lifetime of every skim file can consume gigabytes.
             self._orig_idx = None
             self._dest_idx = None
         else:
             self.layout = SPARSE
+            self._dense_reindex = None
             self._orig_idx = orig_idx
             self._dest_idx = dest_idx
 
     def _detect_dense_layout(self, orig_idx, dest_idx):
         """
         Determine whether dense data is arranged in row-major or column-major
-        order.  Raises a ValueError if the data is dense but not sorted in
-        either of these orders.
+        order, allowing any stable zone order. Returns the layout and the source
+        zone order expressed as indexes into the canonical sorted zone mapping.
+
+        Raises a ValueError if the data is dense but not sorted in either dense
+        layout, or if the origin and destination axes use different zone orders.
         """
         n = self.n_zones
 
@@ -106,22 +115,24 @@ class ParquetSkimFile:
 
         # Check the repeated/tiled patterns using reductions that allocate
         # O(n) temporary arrays instead of two additional O(n^2) arrays.
+        row_major_order = orig_2d[:, 0]
         if (
-            np.array_equal(orig_2d[:, 0], expected)
+            np.array_equal(np.sort(row_major_order), expected)
+            and np.array_equal(dest_2d[0, :], row_major_order)
             and np.all(np.ptp(orig_2d, axis=1) == 0)
-            and np.array_equal(dest_2d[0, :], expected)
             and np.all(np.ptp(dest_2d, axis=0) == 0)
         ):
-            return ROW_MAJOR
+            return ROW_MAJOR, row_major_order
 
         # col-major orig/dest patterns are the same as row-major dest/orig
+        col_major_order = orig_2d[0, :]
         if (
-            np.array_equal(orig_2d[0, :], expected)
+            np.array_equal(np.sort(col_major_order), expected)
+            and np.array_equal(dest_2d[:, 0], col_major_order)
             and np.all(np.ptp(orig_2d, axis=0) == 0)
-            and np.array_equal(dest_2d[:, 0], expected)
             and np.all(np.ptp(dest_2d, axis=1) == 0)
         ):
-            return COL_MAJOR
+            return COL_MAJOR, col_major_order
 
         raise ValueError(
             f"parquet skim file {self.file_path} appears to contain dense data "
@@ -151,11 +162,15 @@ class ParquetSkimFile:
 
         n = self.n_zones
         if self.layout == ROW_MAJOR:
-            return np.ascontiguousarray(values.reshape(n, n))
+            matrix = values.reshape(n, n)
         elif self.layout == COL_MAJOR:
-            return np.ascontiguousarray(values.reshape(n, n, order="F"))
+            matrix = values.reshape(n, n, order="F")
         else:
             # sparse layout (may or may not be sorted); scatter into dense matrix
             matrix = np.zeros((n, n), dtype=values.dtype)
             matrix[self._orig_idx, self._dest_idx] = values
             return matrix
+
+        if self._dense_reindex is not None:
+            matrix = matrix[self._dense_reindex][:, self._dense_reindex]
+        return np.ascontiguousarray(matrix)
