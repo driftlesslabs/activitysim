@@ -1191,17 +1191,38 @@ def load_skim_dataset_to_shared_memory(state, skim_tag="taz") -> xr.Dataset:
             # required when coordinate realignment created a dask graph.
             d_shared_mem = d.shm.to_shared_memory(backing, mode="r", load=True)
         else:
-            # setting `load` to false then calling `reload_from_omx_3d` avoids
-            # using dask to load the data into memory, which is not performant
-            # on Windows for large datasets, but this only works if the data
-            # requires no realignment (i.e. the land use table and skims match
-            # exactly in order and length).
-            d_shared_mem = d.shm.to_shared_memory(backing, mode="r", load=False)
-            sh.dataset.reload_from_omx_3d(
-                d_shared_mem,
-                [str(i) for i in omx_file_paths],
-                ignore=state.settings.omx_ignore_patterns,
-            )
+            # Store each 3-D variable with its OMX pages contiguous. This lets
+            # Sharrow's cross-platform workers read source matrices directly
+            # into their final shared-memory locations without matrix-sized
+            # temporary arrays. This path requires exact source alignment.
+            array_order = {
+                name: "last-axis-first"
+                for name, variable in d.data_vars.items()
+                if variable.ndim == 3
+            }
+            try:
+                d_shared_mem = d.shm.to_shared_memory(
+                    backing,
+                    mode="r",
+                    load=False,
+                    array_order=array_order,
+                )
+            except TypeError as err:
+                if "array_order" not in str(err):
+                    raise
+                # Sharrow before 2.16.3 does not support storage-order hints.
+                d_shared_mem = d.shm.to_shared_memory(backing, mode="r", load=False)
+            try:
+                sh.dataset.reload_from_omx_3d(
+                    d_shared_mem,
+                    [str(i) for i in omx_file_paths],
+                    ignore=state.settings.omx_ignore_patterns,
+                )
+            except Exception:
+                d_shared_mem.shm.release_shared_memory()
+                for f in omx_file_handles:
+                    f.close()
+                raise
         for f in omx_file_handles:
             f.close()
         return d_shared_mem
