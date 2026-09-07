@@ -693,27 +693,34 @@ def destination_presample(
 
     skims = skim_hotel.sample_skims(presample=True)
 
+    explicit_chunk_size = getattr(model_settings, "explicit_chunk", 0)
+    if explicit_chunk_size:
+        chooser_chunks = chunk.adaptive_chunked_choosers(
+            state,
+            trips_taz,
+            trace_label,
+            f"{chunk_tag}.pipeline",
+            chunk_size=state.settings.chunk_size,
+            explicit_chunk_size=explicit_chunk_size,
+        )
+    else:
+        # Preserve the legacy unchunked call contract, including compatibility
+        # with callers that supply a lightweight settings object.
+        chooser_chunks = ((0, trips_taz, trace_label, None),)
+
     # Bound the entire two-stage sampling pipeline, not just utility
-    # evaluation inside interaction_sample.  choose_MAZ_for_TAZ temporarily
+    # evaluation inside interaction_sample. choose_MAZ_for_TAZ temporarily
     # expands every sampled TAZ by its constituent MAZs; doing that for a full
     # trip-purpose segment can consume many GiB even when interaction_sample is
-    # itself chunked.  Keeping both stages inside this outer chooser loop lets
+    # itself chunked. Keeping both stages inside this outer chooser loop lets
     # each expanded MAZ frame be released before the next chunk.
     maz_sample_chunks = []
     preprocess_alternatives = True
-    for (
-        _i,
-        trips_taz_chunk,
-        chunk_trace_label,
-        _chunk_sizer,
-    ) in chunk.adaptive_chunked_choosers(
-        state,
-        trips_taz,
-        trace_label,
-        f"{chunk_tag}.pipeline",
-        chunk_size=state.settings.chunk_size,
-        explicit_chunk_size=model_settings.explicit_chunk,
-    ):
+    for _i, trips_taz_chunk, chunk_trace_label, _chunk_sizer in chooser_chunks:
+        sample_kwargs = {}
+        if explicit_chunk_size:
+            sample_kwargs["preprocess_alternatives"] = preprocess_alternatives
+
         taz_sample = _destination_sample(
             state,
             primary_purpose,
@@ -727,9 +734,10 @@ def destination_presample(
             chunk_tag=chunk_tag,
             trace_label=chunk_trace_label,
             zone_layer="taz",
-            preprocess_alternatives=preprocess_alternatives,
+            **sample_kwargs,
         )
-        preprocess_alternatives = False
+        if explicit_chunk_size:
+            preprocess_alternatives = False
 
         # Choose a MAZ for each DEST_TAZ choice, with probability based on its
         # share of the TAZ's purpose-specific size term.
@@ -746,7 +754,8 @@ def destination_presample(
         )
         maz_sample_chunks.append(maz_sample_chunk)
         del taz_sample, maz_sample_chunk
-        mem.release_memory()
+        if explicit_chunk_size:
+            mem.release_memory()
 
     maz_sample = pd.concat(maz_sample_chunks)
 
