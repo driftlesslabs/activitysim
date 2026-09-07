@@ -7,12 +7,12 @@ import logging
 import pandas as pd
 from pydantic import BaseModel as PydanticBase
 
+from activitysim.abm.models.park_and_ride_lot_choice import run_park_and_ride_lot_choice
 from activitysim.core import config, expressions, los, simulate, tracing, workflow
 from activitysim.core.configuration.logit import (
     TourLocationComponentSettings,
     TourModeComponentSettings,
 )
-from activitysim.abm.models.park_and_ride_lot_choice import run_park_and_ride_lot_choice
 
 logger = logging.getLogger(__name__)
 
@@ -192,6 +192,7 @@ def compute_location_choice_logsums(
     in_period_col: str | None = None,
     out_period_col: str | None = None,
     duration_col: str | None = None,
+    explicit_chunk_size: float | None = None,
 ):
     """
 
@@ -351,6 +352,9 @@ def compute_location_choice_logsums(
             trace_label=trace_label,
         )
 
+    if explicit_chunk_size is None:
+        explicit_chunk_size = model_settings.explicit_chunk
+
     logsums = simulate.simple_simulate_logsums(
         state,
         choosers,
@@ -361,7 +365,7 @@ def compute_location_choice_logsums(
         chunk_size=chunk_size,
         chunk_tag=chunk_tag,
         trace_label=trace_label,
-        explicit_chunk_size=model_settings.explicit_chunk,
+        explicit_chunk_size=explicit_chunk_size,
         compute_settings=logsum_settings.compute_settings,
     )
 
