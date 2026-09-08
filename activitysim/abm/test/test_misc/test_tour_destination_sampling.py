@@ -37,6 +37,7 @@ def test_destination_logsums_join_persons_inside_chunks(monkeypatch):
     def chunked(*args, **kwargs):
         assert args[1].index.tolist() == [11, 22]
         assert args[2] is sample
+        assert kwargs["chunk_size"] == 123
         assert kwargs["explicit_chunk_size"] == 0.5
         yield 1, args[1].iloc[:1], sample.iloc[:2], "logsums.i1", chunk_sizer
         yield 2, args[1].iloc[1:], sample.iloc[2:], "logsums.i2", chunk_sizer
@@ -48,6 +49,7 @@ def test_destination_logsums_join_persons_inside_chunks(monkeypatch):
 
     def compute_logsums(_state, choosers, *args, **kwargs):
         chooser_lengths.append(len(choosers))
+        assert args[4] == 0
         assert kwargs["explicit_chunk_size"] == 0
         return choosers["alt_dest"] + choosers["income"]
 
@@ -64,7 +66,7 @@ def test_destination_logsums_join_persons_inside_chunks(monkeypatch):
         sample,
         model_settings,
         Mock(),
-        chunk_size=0,
+        chunk_size=123,
         trace_label="non_mandatory.shopping.logsums",
     )
 

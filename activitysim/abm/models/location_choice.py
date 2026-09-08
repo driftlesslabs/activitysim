@@ -658,7 +658,7 @@ def run_location_logsums(
                 logsum_settings,
                 model_settings,
                 network_los,
-                chunk_size,
+                0,
                 chunk_tag,
                 chunk_trace_label,
                 explicit_chunk_size=0,

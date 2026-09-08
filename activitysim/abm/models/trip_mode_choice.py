@@ -118,6 +118,17 @@ def trip_mode_choice(
 
     skim_dict = network_los.get_default_skim_dict()
 
+    def add_trip_period(choosers):
+        choosers["trip_period"] = network_los.skim_time_period_label(
+            choosers.depart, as_cat=True
+        )
+        if hasattr(skim_dict, "map_time_periods_from_series"):
+            trip_period_idx = skim_dict.map_time_periods_from_series(
+                choosers["trip_period"]
+            )
+            if trip_period_idx is not None:
+                choosers["trip_period"] = trip_period_idx
+
     odt_skim_stack_wrapper = skim_dict.wrap_3d(
         orig_key=orig_col, dest_key=dest_col, dim3_key="trip_period"
     )
@@ -169,15 +180,7 @@ def trip_mode_choice(
             trips_segment = base_trips_segment.copy()
         assert trips_segment.index.equals(base_trips_segment.index)
 
-        trips_segment["trip_period"] = network_los.skim_time_period_label(
-            trips_segment.depart, as_cat=True
-        )
-        if hasattr(skim_dict, "map_time_periods_from_series"):
-            trip_period_idx = skim_dict.map_time_periods_from_series(
-                trips_segment["trip_period"]
-            )
-            if trip_period_idx is not None:
-                trips_segment["trip_period"] = trip_period_idx
+        add_trip_period(trips_segment)
 
         logger.info(
             "trip_mode_choice tour_type '%s' (%s trips)"
@@ -338,10 +341,21 @@ def trip_mode_choice(
     locals_dict.update(constants)
     locals_dict.update(skims)
     locals_dict["timeframe"] = "trip"
-    expressions.annotate_tables(
-        state,
-        locals_dict=locals_dict,
-        skims=skims,
-        model_settings=model_settings,
-        trace_label=trace_label,
-    )
+    # Three-dimensional skim wrappers require trip_period. It is normally only
+    # needed in the purpose-sized chooser frames above, but post-choice table
+    # annotators may also use those skims. Add it to the full trips table only
+    # for annotation, then restore the original table schema.
+    add_trip_period(trips_df)
+    try:
+        expressions.annotate_tables(
+            state,
+            locals_dict=locals_dict,
+            skims=skims,
+            model_settings=model_settings,
+            trace_label=trace_label,
+        )
+    finally:
+        trips_df.drop(columns="trip_period", inplace=True)
+        state_trips = state.get_dataframe("trips", as_copy=False)
+        if state_trips is not trips_df:
+            state_trips.drop(columns="trip_period", inplace=True)

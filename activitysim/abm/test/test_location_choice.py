@@ -114,6 +114,7 @@ def test_location_logsums_join_person_attributes_inside_chunks(monkeypatch):
     def chunked(*args, **kwargs):
         assert args[1] is persons
         assert args[2] is sample
+        assert kwargs["chunk_size"] == 123
         assert kwargs["explicit_chunk_size"] == 0.5
         yield 1, persons.iloc[:1], sample.iloc[:2], "logsums.i1", chunk_sizer
         yield 2, persons.iloc[1:], sample.iloc[2:], "logsums.i2", chunk_sizer
@@ -125,6 +126,7 @@ def test_location_logsums_join_person_attributes_inside_chunks(monkeypatch):
 
     def compute_logsums(_state, choosers, *args, **kwargs):
         chooser_lengths.append(len(choosers))
+        assert args[4] == 0
         assert kwargs["explicit_chunk_size"] == 0
         return choosers["alt_dest"] + choosers["income"]
 
@@ -139,7 +141,7 @@ def test_location_logsums_join_person_attributes_inside_chunks(monkeypatch):
         Mock(),
         sample,
         model_settings,
-        chunk_size=0,
+        chunk_size=123,
         chunk_tag="school_location.logsums",
         trace_label="school_location.logsums.work",
     )
