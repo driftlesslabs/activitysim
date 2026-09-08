@@ -694,6 +694,13 @@ def destination_presample(
     skims = skim_hotel.sample_skims(presample=True)
 
     explicit_chunk_size = getattr(model_settings, "explicit_chunk", 0)
+    if (
+        explicit_chunk_size
+        and state.settings.chunk_training_mode != chunk.MODE_EXPLICIT
+    ):
+        # Adaptive sampling already owns a ledger; do not nest an additional
+        # pipeline ledger merely because the model has an explicit setting.
+        explicit_chunk_size = 0
     if explicit_chunk_size:
         chooser_chunks = chunk.adaptive_chunked_choosers(
             state,
@@ -1357,7 +1364,12 @@ def choose_trip_destination(
     lifecycle because they intentionally consume the complete sample table.
     """
 
-    if estimator or want_sample_table or not model_settings.explicit_chunk:
+    if (
+        state.settings.chunk_training_mode != chunk.MODE_EXPLICIT
+        or estimator
+        or want_sample_table
+        or not model_settings.explicit_chunk
+    ):
         return _choose_trip_destination_unchunked(
             state,
             primary_purpose,
@@ -1374,6 +1386,9 @@ def choose_trip_destination(
             trace_label,
         )
 
+    # The outer pipeline owns the chunk boundary. In particular, a fractional
+    # size must not be applied again to each already bounded chooser chunk.
+    inner_settings = model_settings.model_copy(update={"explicit_chunk": 0})
     destination_chunks = []
     for (
         _i,
@@ -1394,7 +1409,7 @@ def choose_trip_destination(
             trips_chunk,
             alternatives,
             tours_merged,
-            model_settings,
+            inner_settings,
             want_logsums,
             want_sample_table=False,
             size_term_matrix=size_term_matrix,

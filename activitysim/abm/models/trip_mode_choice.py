@@ -274,6 +274,11 @@ def trip_mode_choice(
             ), "{cols_not_in_choosers} from CHOOSER_COLS_TO_KEEP is not in the choosers dataframe"
             cols_to_keep_list.append(trips_segment[cols_to_keep])
 
+        # Wrappers retain their last chooser frame (and possibly array views).
+        # Retarget to an independent empty frame before releasing this purpose.
+        simulate.set_skim_wrapper_targets(
+            trips_segment.iloc[:0].copy(), skims, allow_partial_success=False
+        )
         del trips_segment, base_trips_segment
         mem.release_memory()
 

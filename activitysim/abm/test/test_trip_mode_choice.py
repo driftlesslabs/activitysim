@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import weakref
 from types import SimpleNamespace
 
 import pandas as pd
@@ -7,12 +8,19 @@ import pandas as pd
 from activitysim.abm.models import trip_mode_choice as trip_mode_choice_module
 
 
+class _DummySkimWrapper:
+    df = None
+
+    def set_df(self, df):
+        self.df = df
+
+
 class _DummySkimDict:
     def wrap_3d(self, **_kwargs):
-        return object()
+        return _DummySkimWrapper()
 
     def wrap(self, *_args):
-        return object()
+        return _DummySkimWrapper()
 
     def map_time_periods_from_series(self, periods):
         return periods.map({"AM": 0, "PM": 1})
@@ -103,7 +111,16 @@ def test_post_choice_annotations_receive_full_trip_period_then_remove_it(monkeyp
         lambda *_args, **_kwargs: None,
     )
 
+    chooser_refs = []
+    wrappers = []
+
     def choose_mode(_state, choosers, **_kwargs):
+        assert all(ref() is None for ref in chooser_refs)
+        chooser_refs.append(weakref.ref(choosers))
+        wrappers[:] = _kwargs["skims"].values()
+        trip_mode_choice_module.simulate.set_skim_wrapper_targets(
+            choosers, _kwargs["skims"]
+        )
         return pd.DataFrame(
             {
                 "trip_mode": "DRIVE",
@@ -132,6 +149,8 @@ def test_post_choice_annotations_receive_full_trip_period_then_remove_it(monkeyp
         model_settings=model_settings,
     )
 
+    assert all(ref() is None for ref in chooser_refs)
+    assert all(wrapper.df.empty for wrapper in wrappers)
     result = state.get_dataframe("trips", as_copy=False)
     assert "trip_period" not in trips
     assert "trip_period" not in result
