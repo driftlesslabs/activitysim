@@ -179,6 +179,24 @@ def filter_chooser_columns(
     return choosers
 
 
+def get_pnr_index_multiplier(choosers, logsum_settings):
+    """Keep PNR synthetic chooser IDs stable across complete chooser chunks.
+
+    Lot choice disambiguates repeated destination-sample indices using a
+    multiplier rounded up to a multiple of ten. Compute it over the full
+    segment so changing chunk size cannot change the random-number keys.
+    """
+    include_pnr = (
+        logsum_settings.get("include_pnr_for_logsums", False)
+        if isinstance(logsum_settings, dict)
+        else getattr(logsum_settings, "include_pnr_for_logsums", False)
+    )
+    if not include_pnr or choosers.index.is_unique:
+        return None
+    max_count = int(choosers.groupby(level=0).size().max())
+    return ((max_count + 9) // 10) * 10
+
+
 def compute_location_choice_logsums(
     state: workflow.State,
     choosers: pd.DataFrame,
@@ -193,6 +211,7 @@ def compute_location_choice_logsums(
     out_period_col: str | None = None,
     duration_col: str | None = None,
     explicit_chunk_size: float | None = None,
+    pnr_index_multiplier: int | None = None,
 ):
     """
 
@@ -304,6 +323,7 @@ def compute_location_choice_logsums(
             # both overrides through lot choice, not just mode simulation.
             chunk_size=chunk_size,
             explicit_chunk_size=explicit_chunk_size,
+            chooser_index_multiplier=pnr_index_multiplier,
         )
 
     logsum_spec = state.filesystem.read_model_spec(file_name=logsum_settings.SPEC)

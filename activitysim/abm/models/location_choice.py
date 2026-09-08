@@ -630,6 +630,9 @@ def run_location_logsums(
     # The old full-table join could retain millions of rows and all derived
     # logsum preprocessor columns before the utility evaluator began chunking.
     # At production scale that defeated explicit chunking and exhausted memory.
+    pnr_index_multiplier = logsum.get_pnr_index_multiplier(
+        location_sample_df, logsum_settings
+    )
     logsum_chunks = []
     for (
         _i,
@@ -662,6 +665,7 @@ def run_location_logsums(
                 chunk_tag,
                 chunk_trace_label,
                 explicit_chunk_size=0,
+                pnr_index_multiplier=pnr_index_multiplier,
             )
         )
         chunk_sizer.log_df(chunk_trace_label, "logsum_choosers", None)

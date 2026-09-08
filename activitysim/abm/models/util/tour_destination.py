@@ -802,6 +802,9 @@ def run_destination_logsums(
     tour_choosers = destination_sample.loc[
         ~destination_sample.index.duplicated(keep="first"), [chooser_id_column]
     ]
+    pnr_index_multiplier = logsum.get_pnr_index_multiplier(
+        destination_sample, logsum_settings
+    )
     logsum_chunks = []
     for (
         _i,
@@ -840,6 +843,7 @@ def run_destination_logsums(
                 chunk_tag,
                 chunk_trace_label,
                 explicit_chunk_size=0,
+                pnr_index_multiplier=pnr_index_multiplier,
             )
         )
         chunk_sizer.log_df(chunk_trace_label, "logsum_choosers", None)
