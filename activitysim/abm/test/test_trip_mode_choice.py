@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import weakref
+from contextlib import nullcontext
 from types import SimpleNamespace
 
 import pandas as pd
+import pytest
 
 from activitysim.abm.models import trip_mode_choice as trip_mode_choice_module
 
@@ -55,7 +57,12 @@ class _DummyState:
         return False
 
 
-def test_post_choice_annotations_receive_full_trip_period_then_remove_it(monkeypatch):
+@pytest.mark.parametrize("keep_trip_period", [False, True])
+@pytest.mark.parametrize("copy_annotation_table", [False, True])
+@pytest.mark.parametrize("annotation_error", [False, True])
+def test_post_choice_annotations_preserve_requested_trip_period(
+    monkeypatch, keep_trip_period, copy_annotation_table, annotation_error
+):
     trips = pd.DataFrame(
         {
             "tour_id": [11, 12, 13],
@@ -79,7 +86,7 @@ def test_post_choice_annotations_receive_full_trip_period_then_remove_it(monkeyp
     model_settings = SimpleNamespace(
         MODE_CHOICE_LOGSUM_COLUMN_NAME="mode_choice_logsum",
         TOURS_MERGED_CHOOSER_COLUMNS=[],
-        CHOOSER_COLS_TO_KEEP=[],
+        CHOOSER_COLS_TO_KEEP=["trip_period"] if keep_trip_period else [],
         FORCE_ESCORTEE_CHAUFFEUR_MODE_MATCH=False,
         SPEC="trip_mode_choice.csv",
         explicit_chunk=None,
@@ -132,26 +139,33 @@ def test_post_choice_annotations_receive_full_trip_period_then_remove_it(monkeyp
     monkeypatch.setattr(trip_mode_choice_module, "mode_choice_simulate", choose_mode)
 
     def annotate_tables(_state, **_kwargs):
-        annotated = _state.get_dataframe("trips")
+        annotated = _state.get_dataframe("trips", as_copy=copy_annotation_table)
         assert annotated.index.equals(trips.index)
         assert annotated["trip_period"].tolist() == [0, 1, 0]
         annotated["post_choice_skim_value"] = [10.0, 20.0, 30.0]
         _state.add_table("trips", annotated)
+        if annotation_error:
+            raise RuntimeError("annotation failed")
 
     monkeypatch.setattr(
         trip_mode_choice_module.expressions, "annotate_tables", annotate_tables
     )
 
-    trip_mode_choice_module.trip_mode_choice(
-        state,
-        trips,
-        network_los,
-        model_settings=model_settings,
-    )
+    with pytest.raises(
+        RuntimeError, match="annotation failed"
+    ) if annotation_error else nullcontext():
+        trip_mode_choice_module.trip_mode_choice(
+            state,
+            trips,
+            network_los,
+            model_settings=model_settings,
+        )
 
     assert all(ref() is None for ref in chooser_refs)
     assert all(wrapper.df.empty for wrapper in wrappers)
     result = state.get_dataframe("trips", as_copy=False)
-    assert "trip_period" not in trips
-    assert "trip_period" not in result
+    assert ("trip_period" in trips) == keep_trip_period
+    assert ("trip_period" in result) == keep_trip_period
+    if keep_trip_period:
+        assert result["trip_period"].tolist() == [0, 1, 0]
     assert result["post_choice_skim_value"].tolist() == [10.0, 20.0, 30.0]

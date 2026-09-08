@@ -350,7 +350,9 @@ def trip_mode_choice(
     # needed in the purpose-sized chooser frames above, but post-choice table
     # annotators may also use those skims. Add it to the full trips table only
     # for annotation, then restore the original table schema.
-    add_trip_period(trips_df)
+    temporary_trip_period = "trip_period" not in trips_df.columns
+    if temporary_trip_period:
+        add_trip_period(trips_df)
     try:
         expressions.annotate_tables(
             state,
@@ -360,7 +362,10 @@ def trip_mode_choice(
             trace_label=trace_label,
         )
     finally:
-        trips_df.drop(columns="trip_period", inplace=True)
-        state_trips = state.get_dataframe("trips", as_copy=False)
-        if state_trips is not trips_df:
-            state_trips.drop(columns="trip_period", inplace=True)
+        # CHOOSER_COLS_TO_KEEP may have made trip_period an output column.
+        # Remove it only when this annotation block created it temporarily.
+        if temporary_trip_period:
+            trips_df.drop(columns="trip_period", inplace=True)
+            state_trips = state.get_dataframe("trips", as_copy=False)
+            if state_trips is not trips_df:
+                state_trips.drop(columns="trip_period", inplace=True)
