@@ -182,6 +182,8 @@ def run_park_and_ride_lot_choice(
     model_settings_file_name: str = "park_and_ride_lot_choice.yaml",
     pnr_capacity_cls: ParkAndRideCapacity | None = None,
     trace_label: str = "park_and_ride_lot_choice",
+    chunk_size: int | None = None,
+    explicit_chunk_size: float | None = None,
 ) -> pd.Series:
     """
     Run the park-and-ride lot choice model.
@@ -345,7 +347,12 @@ def run_park_and_ride_lot_choice(
         trace_label=trace_label,
         trace_choice_name=trace_label,
         estimator=estimator,
-        explicit_chunk_size=model_settings.explicit_chunk,
+        chunk_size=chunk_size,
+        explicit_chunk_size=(
+            model_settings.explicit_chunk
+            if explicit_chunk_size is None
+            else explicit_chunk_size
+        ),
         compute_settings=model_settings.compute_settings,
     )
 

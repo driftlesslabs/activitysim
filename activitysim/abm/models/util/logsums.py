@@ -300,6 +300,10 @@ def compute_location_choice_logsums(
             estimator=None,
             pnr_capacity_cls=None,
             trace_label=tracing.extend_trace_label(trace_label, "pnr_lot_choice"),
+            # The caller may already own the logsum chunk ledger. Propagate
+            # both overrides through lot choice, not just mode simulation.
+            chunk_size=chunk_size,
+            explicit_chunk_size=explicit_chunk_size,
         )
 
     logsum_spec = state.filesystem.read_model_spec(file_name=logsum_settings.SPEC)
