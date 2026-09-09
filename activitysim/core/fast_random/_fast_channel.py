@@ -15,6 +15,9 @@ _SEED_MASK = 0xFFFFFFFF
 # It cannot be imported from random.py here because random.py imports FastChannel.
 _MASKED_ALT_ID = -999
 
+# Target 512 KiB per shock batch, or one chooser when its draw width is larger.
+_MAX_RANDOM_BATCH_VALUES = 65_536
+
 
 def hash32(s):
     """
@@ -460,6 +463,31 @@ class FastChannel:
             self._state_array, selected_positions=selected_positions, shape=n
         )
 
+    def _draw_batches_for_df(self, df, step_name, width, gumbel=False):
+        """Yield bounded chooser batches while preserving each row's draw order.
+
+        Validate the entire request before splitting it, so duplicate rows cannot
+        slip through in different batches. Only the requested output survives a
+        batch; the dense stable-universe shocks are discarded by the caller.
+        """
+        assert step_name is not None
+        assert step_name == self.step_name
+        selected_positions = self._check_valid_df(df)
+        self._reseed_step()
+        batch_rows = max(1, _MAX_RANDOM_BATCH_VALUES // max(1, width))
+        draw = (
+            self._fast_generator.vector_random_standard_gumbel
+            if gumbel
+            else self._fast_generator.vector_random_standard_uniform
+        )
+        for start in range(0, len(df), batch_rows):
+            rows = slice(start, min(start + batch_rows, len(df)))
+            yield rows, draw(
+                self._state_array,
+                selected_positions=selected_positions[rows],
+                shape=width,
+            )
+
     def random_for_df_stable_alt_positions(
         self,
         df: pd.DataFrame,
@@ -483,8 +511,10 @@ class FastChannel:
                 "stable_alt_positions values must be within [0, n_total_alts)"
             )
 
-        rands = self.random_for_df(df, step_name, n=n_total_alts)
-        return rands[:, stable_alt_positions]
+        result = np.empty((len(df), n_alts), dtype=np.float64)
+        for rows, rands in self._draw_batches_for_df(df, step_name, n_total_alts):
+            result[rows] = rands[:, stable_alt_positions]
+        return result
 
     def gumbel_for_df(
         self,
@@ -536,17 +566,17 @@ class FastChannel:
         else:
             n_gumbels = n_alts
 
-        gumbels = self.gumbel_for_df(
-            utilities,
-            step_name,
-            n=n_gumbels * sample_size,
-        ).reshape((len(utilities), sample_size, n_gumbels))
-        if stable_alt_positions is not None:
-            gumbels = gumbels[:, :, stable_alt_positions]
-        return np.argmax(
-            gumbels + utility_values[:, np.newaxis, :],
-            axis=2,
-        )
+        positions = np.empty((len(utilities), sample_size), dtype=np.int64)
+        for rows, draws in self._draw_batches_for_df(
+            utilities, step_name, n_gumbels * sample_size, gumbel=True
+        ):
+            gumbels = draws.reshape((-1, sample_size, n_gumbels))
+            if stable_alt_positions is not None:
+                gumbels = gumbels[:, :, stable_alt_positions]
+            positions[rows] = np.argmax(
+                gumbels + utility_values[rows, np.newaxis, :], axis=2
+            )
+        return positions
 
     def gumbel_choice_positions_for_df(
         self,
@@ -587,22 +617,24 @@ class FastChannel:
                 )
             active_mask = safe_alt_nrs = None
 
-        row_gumbels = self.gumbel_for_df(utilities, step_name, n=n_rands)
-        if alt_nrs_df is None:
-            return np.argmax(utility_values + row_gumbels, axis=1)
-
         positions = np.empty(n_rows, dtype=np.int64)
-        for row_num in range(n_rows):
-            # Work only with active columns so padded high-utility columns cannot win.
-            active = np.flatnonzero(active_mask[row_num])
-            if active.size == 0:
-                positions[row_num] = 0
+        for rows, row_gumbels in self._draw_batches_for_df(
+            utilities, step_name, n_rands, gumbel=True
+        ):
+            if alt_nrs_df is None:
+                positions[rows] = np.argmax(utility_values[rows] + row_gumbels, axis=1)
                 continue
-            gumbel = (
-                utility_values[row_num, active]
-                + row_gumbels[row_num, safe_alt_nrs[row_num, active]]
-            )
-            positions[row_num] = active[np.argmax(gumbel)]
+            for batch_row, row_num in enumerate(range(rows.start, rows.stop)):
+                # Work only with active columns so padded high-utility columns cannot win.
+                active = np.flatnonzero(active_mask[row_num])
+                if active.size == 0:
+                    positions[row_num] = 0
+                    continue
+                gumbel = (
+                    utility_values[row_num, active]
+                    + row_gumbels[batch_row, safe_alt_nrs[row_num, active]]
+                )
+                positions[row_num] = active[np.argmax(gumbel)]
         return positions
 
     def choice_for_df(

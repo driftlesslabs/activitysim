@@ -653,3 +653,79 @@ def test_gumbel_choice_positions_for_df_fully_masked_row_falls_back_to_first_col
     npt.assert_array_equal(masked_positions[[0, 2]], baseline_positions[[0, 2]])
     # the masked row still consumes its n_rands draws, so offsets stay aligned
     npt.assert_allclose(masked_following, baseline_following)
+
+
+@pytest.mark.parametrize("channel_type", ("fast", "faster"))
+@pytest.mark.parametrize(
+    "operation", ("uniform", "max", "stable_max", "choice", "mapped_choice")
+)
+def test_fast_eet_batches_bound_memory_and_preserve_streams(
+    monkeypatch, channel_type, operation
+):
+    """Batching must bound dense allocations without changing choices or later draws."""
+    from activitysim.core.fast_random import _fast_channel
+
+    persons = pd.DataFrame(index=pd.Index([11, 22, 33, 44, 55], name="person_id"))
+    requested = persons.iloc[::-1]
+    utilities = pd.DataFrame(np.arange(15).reshape(5, 3) / 10, index=requested.index)
+    mapping = np.array([0, 3, 7])
+    baseline = random.Random(channel_type)
+    observed = random.Random(channel_type)
+    for rng in (baseline, observed):
+        rng.add_channel("persons", persons)
+        rng.begin_step("batched")
+        rng.random_for_df(requested, n=7)
+
+    width = 3 if operation in ("max", "choice") else 8
+    sample_size = 3 if operation in ("max", "stable_max") else 1
+    if operation == "uniform":
+        expected = baseline.random_for_df(requested, n=width)[:, mapping]
+    else:
+        shocks = baseline.gumbel_for_df(requested, n=width * sample_size)
+        shocks = shocks.reshape(len(requested), sample_size, width)
+        if width == 8:
+            shocks = shocks[:, :, mapping]
+        expected = np.argmax(shocks + utilities.to_numpy()[:, None, :], axis=2)
+        if sample_size == 1:
+            expected = expected[:, 0]
+
+    # Force several batches, including a single row wider than the budget.
+    budget = 7
+    monkeypatch.setattr(_fast_channel, "_MAX_RANDOM_BATCH_VALUES", budget)
+    generator = observed.get_channel_for_df(requested)._fast_generator
+    method = (
+        "vector_random_standard_uniform"
+        if operation == "uniform"
+        else "vector_random_standard_gumbel"
+    )
+    original = getattr(generator, method)
+    allocations = []
+
+    def checked_draw(*args, **kwargs):
+        result = original(*args, **kwargs)
+        allocations.append(result.size)
+        assert result.size <= max(budget, width * sample_size)
+        return result
+
+    monkeypatch.setattr(generator, method, checked_draw)
+    if operation == "uniform":
+        actual = observed.random_for_df_stable_alt_positions(utilities, mapping, width)
+    elif operation in ("max", "stable_max"):
+        options = (
+            {}
+            if operation == "max"
+            else dict(stable_alt_positions=mapping, n_total_alts=width)
+        )
+        actual = observed.gumbel_max_positions_for_df(utilities, sample_size, **options)
+    elif operation == "choice":
+        actual = observed.gumbel_choice_positions_for_df(utilities)
+    else:
+        alt_nrs = pd.DataFrame(
+            np.tile(mapping, (len(requested), 1)), index=utilities.index
+        )
+        actual = observed.gumbel_choice_positions_for_df(utilities, alt_nrs, width)
+    npt.assert_array_equal(actual, expected)
+    assert len(allocations) > 1
+    npt.assert_array_equal(
+        observed.random_for_df(requested), baseline.random_for_df(requested)
+    )
