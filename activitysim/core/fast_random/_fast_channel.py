@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import hashlib
+import math
+import operator
 from typing import Literal
 
 import numpy as np
@@ -679,25 +681,46 @@ class FastChannel:
         assert step_name is not None
         assert step_name == self.step_name
         selected_positions = self._check_valid_df(df)
-        self._reseed_step()
+        # Validate dimensions individually: multiplying first can hide negative
+        # dimensions, and int() would silently truncate fractional sample sizes.
+        try:
+            draw_shape = (operator.index(size),)
+        except TypeError:
+            try:
+                draw_shape = tuple(operator.index(dim) for dim in size)
+            except TypeError:
+                raise TypeError(
+                    "size must be an integer or a sequence of integers"
+                ) from None
+        if any(dim < 0 for dim in draw_shape):
+            raise ValueError("Negative dimensions are not allowed")
+        total = math.prod(draw_shape)
 
-        # total number of draws required per row
-        if isinstance(size, (int, np.integer)):
-            total = int(size)
-        else:
-            total = int(np.prod(size))
-
-        # population to sample from
-        if isinstance(a, (int, np.integer)):
-            a_arr = np.arange(int(a))
-        else:
+        # Match choice's one-dimensional population contract before materializing
+        # integer populations or changing any per-row RNG state.
+        try:
+            n_pop = operator.index(a)
+        except TypeError:
             a_arr = np.asarray(a)
-        n_pop = len(a_arr)
+            if a_arr.ndim != 1:
+                raise ValueError("a must be 1-dimensional or an integer")
+            n_pop = len(a_arr)
+        else:
+            a_arr = None
+        if n_pop < 0 or (n_pop == 0 and total > 0):
+            raise ValueError("a must be nonempty unless no samples are taken")
+        if not replace and total > n_pop:
+            raise ValueError(
+                "Cannot take a larger sample than population when 'replace=False'"
+            )
+        if a_arr is None:
+            a_arr = np.arange(n_pop)
 
         # Sampling nothing must not advance a stream by generating a permutation.
         if total == 0:
             return np.empty(0, dtype=a_arr.dtype)
 
+        self._reseed_step()
         if replace:
             # draw `total` uniforms per selected row and map to indices in a
             rands = self._fast_generator.vector_random_standard_uniform(
@@ -710,10 +733,6 @@ class FastChannel:
             np.minimum(idx, n_pop - 1, out=idx)
             sample = a_arr[idx].reshape(-1)
         else:
-            if total > n_pop:
-                raise ValueError(
-                    "Cannot take a larger sample than population when 'replace=False'"
-                )
             # draw n_pop uniforms per selected row; argsort produces a random
             # permutation of [0, n_pop), and we take the first `total` entries.
             rands = self._fast_generator.vector_random_standard_uniform(

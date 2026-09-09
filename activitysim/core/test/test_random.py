@@ -769,3 +769,77 @@ def test_zero_size_draws_preserve_stream(channel_type, prior_draws, operation):
         expected_shape = (0,)
     assert result.shape == expected_shape
     npt.assert_array_equal(rng.random_for_df(persons), baseline.random_for_df(persons))
+
+
+@pytest.mark.parametrize("channel_type", CHANNEL_TYPES)
+@pytest.mark.parametrize("prior_draws", (0, 3))
+@pytest.mark.parametrize(
+    "population,size,replace,error",
+    [
+        (5, -1, False, ValueError),
+        (5, (2, -1), False, ValueError),
+        (5, (0, -1), True, ValueError),
+        (5, 1.5, False, TypeError),
+        (5, (1, 1.5), True, TypeError),
+        ([[1, 2], [3, 4]], 1, False, ValueError),
+        (1.5, 1, True, ValueError),
+        ([], 1, True, ValueError),
+        (-1, 1, False, ValueError),
+        (2, 3, False, ValueError),
+    ],
+)
+def test_invalid_choice_inputs_do_not_change_stream(
+    channel_type, prior_draws, population, size, replace, error
+):
+    """Reject NumPy-invalid inputs before initializing or advancing fast states."""
+    persons = pd.DataFrame(index=pd.Index([11, 22], name="person_id"))
+    rng = random.Random(channel_type)
+    baseline = random.Random(channel_type)
+    for manager in (rng, baseline):
+        manager.add_channel("persons", persons)
+        manager.begin_step("invalid_choice")
+        if prior_draws:
+            manager.random_for_df(persons, n=prior_draws)
+    options = dict(a=population, size=size, replace=replace)
+    with pytest.raises(error):
+        np.random.RandomState(0).choice(**options)
+    channel = rng.get_channel_for_df(persons)
+    if channel_type != "simple":
+        before = None if channel._state_array is None else channel._state_array.copy()
+    with pytest.raises(error):
+        rng.choice_for_df(persons, **options)
+    if channel_type != "simple":
+        if before is None:
+            assert channel._state_array is None
+        else:
+            npt.assert_array_equal(channel._state_array, before)
+    npt.assert_array_equal(rng.random_for_df(persons), baseline.random_for_df(persons))
+
+
+@pytest.mark.parametrize("channel_type", ("fast", "faster"))
+@pytest.mark.parametrize(
+    "population", (np.int64(5), np.array(["a", "b", "c", "d", "e"]))
+)
+def test_choice_accepts_integer_tuple_dimensions(channel_type, population):
+    """Valid NumPy integer dimensions retain flattened per-row choice semantics."""
+    persons = pd.DataFrame(index=pd.Index([11, 22], name="person_id"))
+    rng = random.Random(channel_type)
+    rng.add_channel("persons", persons)
+    rng.begin_step("tuple_choice")
+    values = rng.choice_for_df(persons, population, (np.int64(2), 2), replace=False)
+    assert values.shape == (8,)
+    for row in values.reshape(2, 4):
+        assert len(np.unique(row)) == 4
+
+
+@pytest.mark.parametrize("channel_type", CHANNEL_TYPES)
+@pytest.mark.parametrize("replace", (False, True))
+def test_empty_choice_population_allows_zero_draws(channel_type, replace):
+    """An empty population is valid when no samples are requested."""
+    persons = pd.DataFrame(index=pd.Index([11, 22], name="person_id"))
+    rng = random.Random(channel_type)
+    rng.add_channel("persons", persons)
+    rng.begin_step("empty_choice")
+    result = rng.choice_for_df(persons, np.array([], dtype="U1"), 0, replace=replace)
+    assert result.shape == (0,)
+    assert result.dtype == np.dtype("U1")
