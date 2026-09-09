@@ -440,3 +440,24 @@ class TestVectorRandomStandardGumbel:
         state = make_state_array(fg, 50)
         result = fg.vector_random_standard_gumbel(state, shape=200)
         assert np.all(np.isfinite(result))
+
+
+@pytest.mark.parametrize("bit_generator", ("PCG64", "SFC64"))
+@pytest.mark.parametrize("distribution", ("uniform", "normal", "gumbel"))
+@pytest.mark.parametrize("shape", (0, (2, 0, 3)))
+@pytest.mark.parametrize("selection", (None, (1,), ()))
+def test_zero_draw_dimensions_preserve_state(
+    bit_generator, distribution, shape, selection
+):
+    """Explicit output dimensions handle zero draws and empty row selections."""
+    generator = FastGenerator(bit_gen=bit_generator)
+    state = np.array([generator.get_state_array(i) for i in range(3)])
+    before = state.copy()
+    selected = None if selection is None else np.asarray(selection, dtype=np.intp)
+    result = getattr(generator, f"vector_random_standard_{distribution}")(
+        state, selected_positions=selected, shape=shape
+    )
+    rows = len(state) if selected is None else len(selected)
+    trailing = (shape,) if isinstance(shape, int) else shape
+    assert result.shape == (rows, *trailing)
+    np.testing.assert_array_equal(state, before)

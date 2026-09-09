@@ -1972,6 +1972,7 @@ class FastGenerator:
             shape = 1
         if isinstance(shape, (int, np.integer)):
             shape = (shape,)
+        # An explicit row count also supports zero-length draw dimensions.
         if selected_positions is not None:
             return _selected_vector_random_standard_normal(
                 selected_positions,
@@ -1983,7 +1984,7 @@ class FastGenerator:
                 _state_address=self._state_address,
                 _slice_start=self._slice_start,
                 _slice_end=self._slice_end,
-            ).reshape(-1, *shape)
+            ).reshape(len(selected_positions), *shape)
         else:
             return _vector_random_standard_normal(
                 state_array,
@@ -1994,7 +1995,7 @@ class FastGenerator:
                 _state_address=self._state_address,
                 _slice_start=self._slice_start,
                 _slice_end=self._slice_end,
-            ).reshape(-1, *shape)
+            ).reshape(len(state_array), *shape)
 
     def vector_random_standard_uniform(
         self,
@@ -2029,6 +2030,7 @@ class FastGenerator:
             shape = 1
         if isinstance(shape, (int, np.integer)):
             shape = (shape,)
+        # An explicit row count also supports zero-length draw dimensions.
         if selected_positions is not None:
             return _selected_vector_random_standard_uniform(
                 selected_positions,
@@ -2039,7 +2041,7 @@ class FastGenerator:
                 _state_address=self._state_address,
                 _slice_start=self._slice_start,
                 _slice_end=self._slice_end,
-            ).reshape(-1, *shape)
+            ).reshape(len(selected_positions), *shape)
         else:
             return _vector_random_standard_uniform(
                 state_array,
@@ -2049,7 +2051,7 @@ class FastGenerator:
                 _state_address=self._state_address,
                 _slice_start=self._slice_start,
                 _slice_end=self._slice_end,
-            ).reshape(-1, *shape)
+            ).reshape(len(state_array), *shape)
 
     def vector_random_standard_gumbel(
         self,
@@ -2085,6 +2087,7 @@ class FastGenerator:
             shape = 1
         if isinstance(shape, (int, np.integer)):
             shape = (shape,)
+        # An explicit row count also supports zero-length draw dimensions.
         if selected_positions is not None:
             return _selected_vector_random_standard_gumbel(
                 selected_positions,
@@ -2095,7 +2098,7 @@ class FastGenerator:
                 _state_address=self._state_address,
                 _slice_start=self._slice_start,
                 _slice_end=self._slice_end,
-            ).reshape(-1, *shape)
+            ).reshape(len(selected_positions), *shape)
         else:
             return _vector_random_standard_gumbel(
                 state_array,
@@ -2105,4 +2108,4 @@ class FastGenerator:
                 _state_address=self._state_address,
                 _slice_start=self._slice_start,
                 _slice_end=self._slice_end,
-            ).reshape(-1, *shape)
+            ).reshape(len(state_array), *shape)

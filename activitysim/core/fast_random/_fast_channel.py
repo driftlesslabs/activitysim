@@ -570,7 +570,7 @@ class FastChannel:
         for rows, draws in self._draw_batches_for_df(
             utilities, step_name, n_gumbels * sample_size, gumbel=True
         ):
-            gumbels = draws.reshape((-1, sample_size, n_gumbels))
+            gumbels = draws.reshape((rows.stop - rows.start, sample_size, n_gumbels))
             if stable_alt_positions is not None:
                 gumbels = gumbels[:, :, stable_alt_positions]
             positions[rows] = np.argmax(
@@ -693,6 +693,10 @@ class FastChannel:
         else:
             a_arr = np.asarray(a)
         n_pop = len(a_arr)
+
+        # Sampling nothing must not advance a stream by generating a permutation.
+        if total == 0:
+            return np.empty(0, dtype=a_arr.dtype)
 
         if replace:
             # draw `total` uniforms per selected row and map to indices in a

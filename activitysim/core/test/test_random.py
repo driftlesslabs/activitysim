@@ -729,3 +729,43 @@ def test_fast_eet_batches_bound_memory_and_preserve_streams(
     npt.assert_array_equal(
         observed.random_for_df(requested), baseline.random_for_df(requested)
     )
+
+
+@pytest.mark.parametrize("channel_type", CHANNEL_TYPES)
+@pytest.mark.parametrize("prior_draws", (0, 3))
+@pytest.mark.parametrize(
+    "operation",
+    ("uniform", "normal", "lognormal", "gumbel", "choice", "replacement", "gumbel_max"),
+)
+def test_zero_size_draws_preserve_stream(channel_type, prior_draws, operation):
+    """A zero-size request returns an empty result and leaves later draws unchanged."""
+    persons = pd.DataFrame(index=pd.Index([11, 22], name="person_id"))
+    rng = random.Random(channel_type)
+    baseline = random.Random(channel_type)
+    for manager in (rng, baseline):
+        manager.add_channel("persons", persons)
+        manager.begin_step("zero_size")
+        if prior_draws:
+            manager.random_for_df(persons, n=prior_draws)
+    expected_shape = (len(persons), 0)
+    if operation == "uniform":
+        result = rng.random_for_df(persons, n=0)
+    elif operation == "normal":
+        result = rng.normal_for_df(persons, size=0)
+    elif operation == "lognormal":
+        # The public lognormal API has no size argument; exercise its channel path.
+        result = rng.get_channel_for_df(persons).normal_for_df(
+            persons, "zero_size", 0, 1, lognormal=True, size=0
+        )
+    elif operation == "gumbel":
+        result = rng.gumbel_for_df(persons, n=0)
+    elif operation == "gumbel_max":
+        utilities = pd.DataFrame(0.0, index=persons.index, columns=[0, 1, 2])
+        result = rng.gumbel_max_positions_for_df(utilities, sample_size=0)
+    else:
+        result = rng.choice_for_df(
+            persons, a=5, size=0, replace=operation == "replacement"
+        )
+        expected_shape = (0,)
+    assert result.shape == expected_shape
+    npt.assert_array_equal(rng.random_for_df(persons), baseline.random_for_df(persons))
