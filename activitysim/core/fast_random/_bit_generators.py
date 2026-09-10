@@ -64,19 +64,28 @@ from __future__ import annotations
 
 import numba as nb
 import numpy as np
+from llvmlite import ir
+from numba.extending import intrinsic
 
 
-@nb.njit(inline="always")
-def _multiply_high(a, b):
-    """High word of a 64-bit product using portable 32-bit partial products."""
-    mask = np.uint64(0xFFFFFFFF)
-    shift = np.uint64(32)
-    a_low, a_high = a & mask, a >> shift
-    b_low, b_high = b & mask, b >> shift
-    low_product = a_low * b_low
-    middle = a_high * b_low + (low_product >> shift)
-    middle_low = (middle & mask) + a_low * b_high
-    return a_high * b_high + (middle >> shift) + (middle_low >> shift)
+@intrinsic
+def _multiply_high(typingctx, a, b):
+    """Return the high 64 bits of an unsigned 64-by-64-bit product."""
+    if a != nb.types.uint64 or b != nb.types.uint64:
+        return None
+
+    def codegen(context, builder, signature, args):
+        # Widen before multiplying so LLVM can select a native multiply-high
+        # instruction (e.g. ARM64 UMULH). Splitting into 32-bit partial products
+        # obscures this operation and slows long PCG64 uniform sequences.
+        # LLVM handles target lowering; this needs no architecture-specific ASM
+        # or access to NumPy's private state layout.
+        wide = ir.IntType(128)
+        product = builder.mul(builder.zext(args[0], wide), builder.zext(args[1], wide))
+        high = builder.lshr(product, ir.Constant(wide, 64))
+        return builder.trunc(high, ir.IntType(64))
+
+    return nb.types.uint64(a, b), codegen
 
 
 @nb.njit(inline="always")

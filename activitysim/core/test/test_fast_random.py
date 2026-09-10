@@ -6,6 +6,7 @@ import numba as nb
 import numpy as np
 import pytest
 
+from activitysim.core.fast_random._bit_generators import _multiply_high
 from activitysim.core.fast_random._fast_random import FastGenerator
 
 # ---------------------------------------------------------------------------
@@ -548,3 +549,19 @@ def test_owned_transitions_match_numpy_at_arithmetic_boundaries(bit_generator, w
         generator._next_uint64, np.array(words, dtype=np.uint64), 1024
     )
     np.testing.assert_array_equal(actual, reference.random_raw(1024))
+
+
+@nb.njit
+def _high_products(pairs):
+    """Exercise the intrinsic using runtime inputs, without constant folding."""
+    return np.array([_multiply_high(a, b) for a, b in pairs], dtype=np.uint64)
+
+
+def test_multiply_high_matches_python_integers():
+    """Check unsigned widening and carries against arbitrary-precision products."""
+    boundaries = [0, 1, 2**32 - 1, 2**32, 2**63 - 1, 2**63, _MAX_WORD]
+    edges = np.array([(a, b) for a in boundaries for b in boundaries], dtype=np.uint64)
+    random_pairs = np.random.PCG64(12345).random_raw(2048).reshape(-1, 2)
+    pairs = np.concatenate([edges, random_pairs])
+    expected = np.array([(int(a) * int(b)) >> 64 for a, b in pairs], dtype=np.uint64)
+    np.testing.assert_array_equal(_high_products(pairs), expected)
