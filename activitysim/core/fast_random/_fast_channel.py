@@ -14,7 +14,7 @@ from ._fast_random import FastGenerator
 _SEED_MASK = 0xFFFFFFFF
 
 # Keep this private sentinel aligned with activitysim.core.random.MASKED_ALT_ID.
-# It cannot be imported from random.py here because random.py imports FastChannel.
+# Keep this module independent of random.py so either can be imported first.
 _MASKED_ALT_ID = -999
 
 # Target 512 KiB per shock batch, or one chooser when its draw width is larger.

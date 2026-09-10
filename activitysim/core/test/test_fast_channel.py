@@ -1,6 +1,6 @@
 # ActivitySim
 # See full license in LICENSE.txt.
-"""Unit tests for activitysim.core.random.FastChannel."""
+"""Unit tests for activitysim.core.fast_random.FastChannel."""
 
 from __future__ import annotations
 
@@ -11,7 +11,6 @@ import pytest
 
 from activitysim.core.fast_random import FastChannel
 from activitysim.core.fast_random._entropy import fast_entropy_PCG64
-from activitysim.core.fast_random._fast_random import FastGenerator
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -90,9 +89,7 @@ class TestInit:
         states = fast_entropy_PCG64(
             [123, 456], pd.Index(np.arange(1000, dtype=np.uint64))
         )
-        generator = FastGenerator(bit_gen="PCG64")
-        increment_low_word = generator._slice_positions[2]
-        assert np.all(states[:, increment_low_word] & np.uint64(1))
+        assert np.all(states[:, 2] & np.uint64(1))
 
 
 # ---------------------------------------------------------------------------

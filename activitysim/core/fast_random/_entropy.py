@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import lru_cache
 from typing import Literal
 
 import numba as nb
@@ -82,19 +83,21 @@ def _fast_entropy_raw(base_seeds: int | list[int], index_keys: pd.Index) -> np.n
     return _fold_in_256_batch(base_state, np.asarray(index_keys).astype(np.uint64))
 
 
-_FG_PCG64 = FastGenerator(42, "PCG64")
-_FG_SFC64 = FastGenerator(42, "SFC64")
+@lru_cache(maxsize=2)
+def _entropy_generator(bit_gen):
+    """Construct a mixing generator only when its entropy mode is first used."""
+    return FastGenerator(bit_gen=bit_gen)
 
 
 def fast_entropy_PCG64(base_seeds: int | list[int], index_keys: pd.Index) -> np.ndarray:
     generated_states = _fast_entropy_raw(base_seeds, index_keys)
-    # PCG64 requires an odd 128-bit increment.  FastGenerator discovers the
-    # raw CFFI state layout at runtime, so use its mapping rather than assuming
-    # which of the four words contains the increment's least-significant bits.
-    increment_low_word = _FG_PCG64._slice_positions[2]
-    generated_states[:, increment_low_word] |= 1
+    # In the owned layout, word 2 is the low half of the 128-bit increment.
+    # PCG64 requires that increment to be odd.
+    generated_states[:, 2] |= 1
     # make a couple draws to properly mix the state and avoid any initial correlation with the input keys
-    _FG_PCG64.vector_random_standard_uniform(generated_states, shape=2)
+    _entropy_generator("PCG64").vector_random_standard_uniform(
+        generated_states, shape=2
+    )
     return generated_states
 
 
@@ -102,7 +105,9 @@ def fast_entropy_SFC64(base_seeds: int | list[int], index_keys: pd.Index) -> np.
     generated_states = _fast_entropy_raw(base_seeds, index_keys)
     generated_states[:, -1] = 1  # the last word is a counter, start it at 1
     # SFC initialization typically makes a dozen draws to properly mix the state
-    _FG_SFC64.vector_random_standard_uniform(generated_states, shape=12)
+    _entropy_generator("SFC64").vector_random_standard_uniform(
+        generated_states, shape=12
+    )
     return generated_states
 
 

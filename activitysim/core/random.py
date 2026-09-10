@@ -12,7 +12,6 @@ import pandas as pd
 from activitysim.core.exceptions import DuplicateLoadableObjectError, TableIndexError
 from activitysim.core.util import reindex
 
-from .fast_random import FastChannel
 from .tracing import print_elapsed_time
 
 logger = logging.getLogger(__name__)
@@ -667,7 +666,7 @@ class SimpleChannel(object):
 
 
 class Random(object):
-    def __init__(self, channel_type: str = "simple"):
+    def __init__(self, channel_type: str = "legacy"):
         self.channels = {}
 
         # dict mapping df index name to channel name
@@ -678,9 +677,9 @@ class Random(object):
         self.base_seed = 0
         self.global_rng = np.random.RandomState()
 
-        if channel_type not in ("fast", "faster", "simple"):
+        if channel_type not in ("pcg64", "sfc64_hash", "legacy"):
             raise ValueError(
-                f"channel_type must be 'fast', 'faster' or 'simple', got {channel_type!r}"
+                f"channel_type must be 'pcg64', 'sfc64_hash' or 'legacy', got {channel_type!r}"
             )
         self.channel_type = channel_type
 
@@ -806,7 +805,7 @@ class Random(object):
         """
 
         if fast is None:
-            fast = self.channel_type in {"fast", "faster"}
+            fast = self.channel_type in {"pcg64", "sfc64_hash"}
 
         if channel_name in self.channels:
             assert channel_name == self.index_to_channel[domain_df.index.name]
@@ -823,11 +822,16 @@ class Random(object):
                 "Adding channel '%s' %s ids" % (channel_name, len(domain_df.index))
             )
 
-            channel_class = FastChannel if fast else SimpleChannel
+            if fast:
+                from .fast_random import FastChannel
+
+                channel_class = FastChannel
+            else:
+                channel_class = SimpleChannel
             channel_args = {}
-            if fast and self.channel_type == "faster":
+            if fast and self.channel_type == "sfc64_hash":
                 channel_args = {"bit_generator": "SFC64", "entropy_type": "quick"}
-            if fast and self.channel_type == "fast":
+            if fast and self.channel_type == "pcg64":
                 channel_args = {"bit_generator": "PCG64", "entropy_type": "robust"}
             channel = channel_class(
                 channel_name, self.base_seed, domain_df, self.step_name, **channel_args

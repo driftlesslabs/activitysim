@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import numba as nb
 import numpy as np
 import pytest
 
@@ -19,19 +20,10 @@ def make_fast_generator():
 def make_state_array(
     fg: FastGenerator, n_agents: int, base_seed: int = 0
 ) -> np.ndarray:
-    """Return a (n_agents, 4) uint64 state array seeded from PCG64 generators.
-
-    Each row is a valid PCG64 state obtained by seeding a fresh generator with
-    ``base_seed + i`` and reading the current raw CFFI state buffer.  This
-    mirrors exactly the layout consumed by the private ``_several_random_*``
-    functions.
-    """
-    uint64_view = fg._state_bytes.view(np.uint64)
-    state = np.zeros((n_agents, 4), dtype=np.uint64)
-    for i in range(n_agents):
-        fg._bit_generator.state = np.random.PCG64(seed=base_seed + i).state
-        state[i] = uint64_view[fg._slice_start : fg._slice_end].copy()
-    return state
+    """Seed independent rows through NumPy's public state dictionary."""
+    return np.array(
+        [fg.get_state_array(base_seed + i) for i in range(n_agents)], dtype=np.uint64
+    )
 
 
 _MIXED_DRAW_GOLDENS = {
@@ -461,3 +453,98 @@ def test_zero_draw_dimensions_preserve_state(
     trailing = (shape,) if isinstance(shape, int) else shape
     assert result.shape == (rows, *trailing)
     np.testing.assert_array_equal(state, before)
+
+
+@pytest.mark.parametrize("bit_generator", ("PCG64", "SFC64"))
+@pytest.mark.parametrize("seed", (0, 1, 42, 2**32 + 1, 2**64 - 1))
+def test_owned_state_long_mixed_sequence_matches_numpy(bit_generator, seed):
+    """Exercise rejection sampling and carry propagation, then compare final states."""
+    generator = FastGenerator(bit_gen=bit_generator)
+    state = generator.get_state_array(seed)[None, :]
+    numpy_generator = np.random.Generator(getattr(np.random, bit_generator)(seed))
+    for distribution in ("uniform", "normal", "uniform", "normal"):
+        actual = getattr(generator, f"vector_random_standard_{distribution}")(
+            state, shape=4096
+        )[0]
+        expected = (
+            numpy_generator.random(4096)
+            if distribution == "uniform"
+            else numpy_generator.standard_normal(4096)
+        )
+        # libm rounding in the normal tail can differ across platforms.
+        np.testing.assert_allclose(actual, expected, rtol=1e-14, atol=1e-14)
+    public = numpy_generator.bit_generator.state["state"]
+    if bit_generator == "PCG64":
+        expected_state = [
+            public["state"] & ((1 << 64) - 1),
+            public["state"] >> 64,
+            public["inc"] & ((1 << 64) - 1),
+            public["inc"] >> 64,
+        ]
+    else:
+        expected_state = public["state"]
+    np.testing.assert_array_equal(state[0], np.array(expected_state, dtype=np.uint64))
+
+
+@pytest.mark.parametrize("bit_generator", ("PCG64", "SFC64"))
+def test_generation_requires_only_public_numpy_state(monkeypatch, bit_generator):
+    """A seeder with no capsule, CFFI, or ctypes interface must still work."""
+    original = getattr(np.random, bit_generator)
+    reference = np.random.Generator(original(42)).random(20)
+
+    class PublicStateOnly:
+        def __init__(self, seed):
+            self.state = original(seed).state
+
+        def __getattr__(self, name):
+            raise AssertionError(f"private NumPy interface requested: {name}")
+
+    monkeypatch.setattr(np.random, bit_generator, PublicStateOnly)
+    generator = FastGenerator(bit_gen=bit_generator)
+    state = generator.get_state_array(42)[None, :]
+    np.testing.assert_array_equal(
+        generator.vector_random_standard_uniform(state, shape=20)[0], reference
+    )
+
+
+@nb.njit
+def _draw_raw_words(next_word, state, count):
+    """Exercise the transition directly so low bits are not lost to float conversion."""
+    result = np.empty(count, dtype=np.uint64)
+    for i in range(count):
+        result[i] = next_word(state)
+    return result
+
+
+_MAX_WORD = 2**64 - 1
+
+
+@pytest.mark.parametrize(
+    "bit_generator,words",
+    [
+        ("PCG64", [0, 0, 1, 0]),
+        ("PCG64", [_MAX_WORD, _MAX_WORD, _MAX_WORD, _MAX_WORD]),
+        ("PCG64", [_MAX_WORD, 0, 1, 0]),
+        ("PCG64", [0, 0, 1, 63 << 58]),
+        ("SFC64", [0, 0, 0, 1]),
+        ("SFC64", [_MAX_WORD, _MAX_WORD, _MAX_WORD, _MAX_WORD]),
+        ("SFC64", [_MAX_WORD, 0, 1, _MAX_WORD]),
+        ("SFC64", [0, _MAX_WORD, 1 << 63, 0]),
+    ],
+)
+def test_owned_transitions_match_numpy_at_arithmetic_boundaries(bit_generator, words):
+    """Cover 64/128-bit carries, counter wrap, and zero/maximal rotation counts."""
+    reference = getattr(np.random, bit_generator)(0)
+    public = reference.state
+    if bit_generator == "PCG64":
+        public["state"] = dict(
+            state=words[0] + (words[1] << 64), inc=words[2] + (words[3] << 64)
+        )
+    else:
+        public["state"]["state"] = np.array(words, dtype=np.uint64)
+    reference.state = public
+    generator = FastGenerator(bit_gen=bit_generator)
+    actual = _draw_raw_words(
+        generator._next_uint64, np.array(words, dtype=np.uint64), 1024
+    )
+    np.testing.assert_array_equal(actual, reference.random_raw(1024))
