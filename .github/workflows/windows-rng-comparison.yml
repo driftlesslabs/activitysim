@@ -1,0 +1,51 @@
+name: Windows RNG Comparison
+
+on:
+  push:
+    branches: [reroll-windows-perf]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    name: Native Windows x64 paired benchmarks
+    runs-on: windows-2022
+    timeout-minutes: 60
+    env:
+      PYTHONUTF8: "1"
+      PYTHONUNBUFFERED: "1"
+      OMP_NUM_THREADS: "1"
+      OPENBLAS_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
+      NUMBA_NUM_THREADS: "1"
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.10"
+          architecture: x64
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+      - name: Install one locked environment for all revisions
+        run: uv sync --locked
+      - name: Record Windows processor and OS
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force perf-results | Out-Null
+          Get-CimInstance Win32_Processor | Select-Object Name, Manufacturer, NumberOfCores, NumberOfLogicalProcessors | ConvertTo-Json | Out-File -Encoding utf8 perf-results/cpu.json
+          Get-CimInstance Win32_OperatingSystem | Select-Object Caption, Version, BuildNumber, OSArchitecture, TotalVisibleMemorySize | ConvertTo-Json | Out-File -Encoding utf8 perf-results/os.json
+      - name: Compare original, owned, and fixed code on this runner
+        run: uv run --no-sync python other_resources/performance-checks/_windows_rng_comparison.py --output-dir perf-results
+      - name: Upload all timings, memory, checks, and logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-rng-comparison-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            perf-results/
+            !perf-results/checkouts/**
+          if-no-files-found: error
+          retention-days: 90
