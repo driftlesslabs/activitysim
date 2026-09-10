@@ -28,10 +28,12 @@ def write_json(path, data):
 
 
 def run_process(command, checkout, env, destination):
-    """Record process timing and Windows peak working set, including worker samples.
+    """Record timing, launcher working set, and sampled process-tree memory.
 
     Windows peak_wset is the OS-maintained lifetime high-water mark as last
-    observed before exit. The process-tree RSS sum is sampled every 50 ms; short
+    observed before exit. A virtualenv redirector may be the parent process, so
+    its peak does not represent the benchmark: use the process-tree metric for
+    whole-workload comparisons. The tree RSS sum is sampled every 50 ms; short
     peaks between samples may be missed. Neither metric replaces the scripts'
     persistent-state and traced-allocation measurements.
     """
@@ -188,14 +190,14 @@ def main():
         "All benchmark processes completed and all stream invariants passed.",
         "See artifacts for individual samples, tests and environment metadata.",
         "",
-        "| Round | Revision | Script | Seconds | Observed peak working set MiB |",
+        "| Round | Revision | Script | Seconds | Sampled peak process-tree RSS MiB |",
         "|---|---|---|---:|---:|",
     ]
     for run in runs:
         summary.append(
             f"| {run['round']} | {run['revision']} | {run['script']} | "
             f"{run['elapsed_seconds']:.2f} | "
-            f"{run['observed_peak_working_set_mib']:.2f} |"
+            f"{run['sampled_peak_process_tree_rss_mib']:.2f} |"
         )
     report = "\n".join(summary) + "\n"
     (output / "summary.md").write_text(report, encoding="utf-8")
