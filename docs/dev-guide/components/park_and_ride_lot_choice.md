@@ -32,14 +32,13 @@ must be compatible with the default skim dictionary.
 
 ## Configuring an Implementation
 
-PR #1001 provides the model code and unit tests, but does not add a configured
-agency example. The fragments below illustrate the configuration structure;
+The fragments below illustrate the configuration structure;
 the land-use fields, skim names, utility expressions, coefficients, and mode
 names must be supplied for the implementing model.
 
-1. Add a spaces column to `land_use`, with positive values for lot zones and
-   zero for zones without lots. Provide auto access and transit skims between
-   the origin, lot, and destination.
+1. Add a column to `land_use` representing the number of park-and-ride spaces
+   (e.g. pnr_spaces) in that zone. Only zones >= 0 park-and-ride spaces are
+   eligible alternatives for the model.
 2. Add `park_and_ride_lot_choice` to the `models` list in `settings.yaml` after
    the relevant tour destinations and schedules are available and before
    `tour_mode_choice_simulate`. Keep this step in the model list when enabling
@@ -101,13 +100,13 @@ coefficients. The alternative attributes include `pnr_zone_id` and
 ## Capacity Iteration
 
 To enable capacity feedback, add the following to
-`park_and_ride_lot_choice.yaml`, replacing `DRIVE_TRANSIT` with the applicable
+`park_and_ride_lot_choice.yaml`, replacing `PNR_TRANSIT` with the applicable
 mode names from the tour mode choice specification:
 
 ```yaml
 ITERATE_WITH_TOUR_MODE_CHOICE: true
 MAX_ITERATIONS: 5
-PARK_AND_RIDE_MODES: [DRIVE_TRANSIT]
+PARK_AND_RIDE_MODES: [PNR_TRANSIT]
 ACCEPTED_TOLERANCE: 0.95
 RESAMPLE_STRATEGY: latest
 TRACE_PNR_CAPACITIES_PER_ITERATION: true
