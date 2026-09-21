@@ -476,7 +476,9 @@ def _evaluate_and_update(
         candidate_value = prev_value
         lower = row["min"]
         upper = row["max"]
-        if update_coefficients:
+        # Bounds constrain proposed updates, not held or converged values.
+        # Clipping a converged value would invalidate its evaluated result.
+        if update_coefficients and not hold_fast and not converged:
             damping = float(row["damping"])
             raw_delta = _compute_delta(
                 method=method,
@@ -488,9 +490,7 @@ def _evaluate_and_update(
                 default_increment=default_increment,
             )
 
-            candidate_value = (
-                prev_value if hold_fast or converged else prev_value + raw_delta
-            )
+            candidate_value = prev_value + raw_delta
 
             if not pd.isna(lower) and candidate_value <= float(lower):
                 candidate_value = float(lower)

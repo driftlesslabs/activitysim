@@ -266,6 +266,22 @@ Required Columns
      - Absolute difference threshold. A coefficient is "converged" when
        ``|target_value - model_value| <= tolerance``.
 
+Bounds and Fixed Coefficients
+-----------------------------
+
+Bounds apply only when updating a coefficient that is neither held nor
+converged. A coefficient with ``hold_fast: True`` or a model value within
+``tolerance`` of its target retains its current value, even if that coefficient
+is outside the configured bounds. This preserves the coefficient used by the
+simulation that established convergence.
+
+Starting values outside the bounds generate warnings, not errors. If a held
+or converged value violates an intended hard constraint, correct the starting
+coefficient or bounds before calibration; the framework will not silently
+clip it. Held coefficients still have their target differences evaluated and
+are not automatically marked converged. The ``at_min`` and ``at_max`` flags
+continue to identify values at or beyond their respective bounds.
+
 Optional Columns
 -----------------
 

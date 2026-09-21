@@ -684,3 +684,91 @@ def test_csv_rejects_invalid_default_increment(calibration_spec_csv, increment):
         match="calibration.csv default_increment must be finite, numeric, and nonnegative",
     ):
         calibration_spec_csv([row])
+
+
+@pytest.mark.parametrize("initial_value", [-5.0, 5.0])
+@pytest.mark.parametrize(
+    "hold_fast, model_value, expected_converged",
+    [(True, 0.25, False), (True, 0.5, True), (False, 0.5, True)],
+)
+def test_bounds_preserve_held_and_converged_coefficients(
+    monkeypatch, caplog, initial_value, hold_fast, model_value, expected_converged
+):
+    spec = pd.DataFrame(
+        [
+            dict(
+                description="target",
+                coefficient="coef",
+                model_value=model_value,
+                target_value=0.5,
+                hold_fast=hold_fast,
+                min=-1.0,
+                max=1.0,
+                damping=1.0,
+                method="log_ratio",
+                tolerance=0.01,
+            )
+        ]
+    )
+    coefficients = pd.DataFrame({"value": [initial_value]}, index=["coef"])
+    compute_delta = Mock(side_effect=AssertionError("fixed values need no update"))
+    monkeypatch.setattr(component, "_compute_delta", compute_delta)
+
+    component._warn_if_initial_values_outside_bounds(
+        "test_component", spec, coefficients
+    )
+    assert "test_component coefficient coef starts" in caplog.text
+    assert (
+        "below min bound" if initial_value < 0 else "above max bound"
+    ) in caplog.text
+    records, summary, updated, converged = _evaluate_and_update(
+        "test_component", spec, coefficients, {}, 1, 1
+    )
+
+    pd.testing.assert_frame_equal(updated, coefficients)
+    compute_delta.assert_not_called()
+    assert converged is expected_converged
+    assert records[0]["converged"] is expected_converged
+    assert records[0]["prev_coefficient"] == initial_value
+    assert records[0]["next_coefficient"] == initial_value
+    assert records[0]["coef_delta"] == summary["max_change"] == 0.0
+    assert records[0]["at_min"] == (initial_value < 0)
+    assert records[0]["at_max"] == (initial_value > 0)
+    assert summary["num_unconverged"] == int(not expected_converged)
+
+
+@pytest.mark.parametrize(
+    "initial_value, model_value, target_value, expected_value",
+    [(0.9, 0.25, 0.5, 1.0), (-0.9, 0.5, 0.25, -1.0)],
+)
+def test_bounds_still_clip_eligible_updates(
+    initial_value, model_value, target_value, expected_value
+):
+    spec = pd.DataFrame(
+        [
+            dict(
+                description="target",
+                coefficient="coef",
+                model_value=model_value,
+                target_value=target_value,
+                hold_fast=False,
+                min=-1.0,
+                max=1.0,
+                damping=1.0,
+                method="log_ratio",
+                tolerance=0.01,
+            )
+        ]
+    )
+    coefficients = pd.DataFrame({"value": [initial_value]}, index=["coef"])
+
+    records, summary, updated, converged = _evaluate_and_update(
+        "test_component", spec, coefficients, {}, 1, 1
+    )
+
+    assert updated.loc["coef", "value"] == expected_value
+    assert not converged
+    assert records[0]["coef_delta"] == pytest.approx(0.1)
+    assert summary["max_change"] == pytest.approx(0.1)
+    assert records[0]["at_min"] == (expected_value == -1.0)
+    assert records[0]["at_max"] == (expected_value == 1.0)
