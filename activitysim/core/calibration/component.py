@@ -242,7 +242,19 @@ def _read_calibration_spec(state: workflow.State, file_name: str) -> pd.DataFram
             f"calibration_spec {file_name} is missing required columns: {missing}"
         )
 
-    df = df[CALIBRATION_REQUIRED_COLUMNS].copy()
+    # Keep the optional fallback magnitude instead of discarding it with
+    # unrelated columns. Missing columns and blank cells use the default.
+    if "default_increment" not in df.columns:
+        df["default_increment"] = DEFAULT_INCREMENT
+    df = df[CALIBRATION_REQUIRED_COLUMNS + ["default_increment"]].copy()
+    increments = df["default_increment"].replace(r"^\s*$", np.nan, regex=True)
+    increments = pd.to_numeric(increments.fillna(DEFAULT_INCREMENT), errors="coerce")
+    if (~np.isfinite(increments) | (increments < 0)).any():
+        raise ValueError(
+            f"calibration_spec {file_name} default_increment must be finite, "
+            "numeric, and nonnegative"
+        )
+    df["default_increment"] = increments
     df["description"] = df["description"].astype(str)
     df["coefficient"] = df["coefficient"].astype(str)
 

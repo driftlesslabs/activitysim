@@ -280,8 +280,11 @@ Optional Columns
    * - ``default_increment``
      - numeric
      - ``2.0``
-     - Fallback delta when the chosen method encounters invalid inputs (e.g.,
-       zero or negative values for ``log_ratio``).
+     - Finite, nonnegative fallback magnitude when the chosen method encounters
+       invalid inputs (e.g., zero or negative values for ``log_ratio``). The
+       adjustment direction is determined by the model and target values.
+       An omitted column or blank cell uses ``2.0``; ``0`` disables the fallback
+       adjustment for that row.
 
 Comment Rows
 -------------

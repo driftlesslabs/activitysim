@@ -594,3 +594,93 @@ def test_evaluation_only_does_not_clip_or_compute_adjustments(monkeypatch):
     assert records[0]["coef_delta"] == summary["max_change"] == 0.0
     assert records[0]["at_max"]
     compute_delta.assert_not_called()
+
+
+@pytest.fixture
+def calibration_spec_csv(tmp_path):
+    """Write real CSV inputs so tests exercise optional-column parsing."""
+
+    def read(rows):
+        path = tmp_path / "calibration.csv"
+        pd.DataFrame(rows).to_csv(path, index=False)
+        state = SimpleNamespace(
+            filesystem=SimpleNamespace(get_config_file_path=lambda name: path)
+        )
+        return component._read_calibration_spec(state, path.name)
+
+    return read
+
+
+@pytest.mark.parametrize(
+    "method, model_value, target_value, direction",
+    [
+        ("log_ratio", 0.0, 0.5, 1),
+        ("log_ratio", 0.5, 0.0, -1),
+        ("odds_ratio", 0.0, 0.5, 1),
+        ("odds_ratio", 1.0, 0.5, -1),
+    ],
+)
+@pytest.mark.parametrize("include_increment", [False, True])
+def test_csv_default_increment_reaches_coefficient_update(
+    calibration_spec_csv,
+    method,
+    model_value,
+    target_value,
+    direction,
+    include_increment,
+):
+    rows = []
+    for i, increment in enumerate([0.25, None, 0.0, "  "]):
+        row = dict(
+            description=f"target {i}",
+            coefficient=f"coef_{i}",
+            model_value=model_value,
+            target_value=target_value,
+            hold_fast=False,
+            min=-10.0,
+            max=10.0,
+            damping=1.0,
+            method=method,
+            tolerance=0.01,
+        )
+        if include_increment:
+            row["default_increment"] = increment
+        rows.append(row)
+    spec = calibration_spec_csv(rows)
+    magnitudes = [0.25, 2.0, 0.0, 2.0] if include_increment else [2.0] * 4
+    assert spec["default_increment"].tolist() == magnitudes
+    coefficients = pd.DataFrame(
+        {"value": [1.0] * 4}, index=[f"coef_{i}" for i in range(4)]
+    )
+
+    records, _, updated, converged = _evaluate_and_update(
+        "test_component", spec, coefficients, {}, 1, 1
+    )
+
+    assert not converged
+    assert updated["value"].tolist() == pytest.approx(
+        [1.0 + direction * magnitude for magnitude in magnitudes]
+    )
+    assert [row["coef_delta"] for row in records] == pytest.approx(magnitudes)
+
+
+@pytest.mark.parametrize("increment", ["invalid", "inf", "-inf", -0.25])
+def test_csv_rejects_invalid_default_increment(calibration_spec_csv, increment):
+    row = dict(
+        description="target",
+        coefficient="coef",
+        model_value=0.0,
+        target_value=0.5,
+        hold_fast=False,
+        min=-10.0,
+        max=10.0,
+        damping=1.0,
+        method="log_ratio",
+        tolerance=0.01,
+        default_increment=increment,
+    )
+    with pytest.raises(
+        ValueError,
+        match="calibration.csv default_increment must be finite, numeric, and nonnegative",
+    ):
+        calibration_spec_csv([row])
