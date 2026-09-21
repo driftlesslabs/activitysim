@@ -163,9 +163,11 @@ Configuration Reference
    * - ``global_iterations``
      - ``int``
      - ``1``
-     - Number of full outer-loop calibration passes over all components. Each
-       global iteration re-runs all precursor models and re-calibrates all
-       components from scratch using the latest coefficients.
+     - Number of full outer-loop calibration passes over all components. 
+       Initially, all precursor models are run to generate starting values. 
+       Each global iteration then re-runs and re-calibrates all components 
+       specified in ``calibrate_models``, plus any intermediate components, 
+       from scratch using the latest coefficients.
    * - ``complete_steps``
      - ``bool``
      - ``False``
