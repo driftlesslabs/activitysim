@@ -662,6 +662,14 @@ A coefficient is considered **converged** when:
 A component is converged when **all** of its coefficients are converged. The
 component inner loop stops early upon convergence.
 
+If the component reaches ``submodel_max_iterations`` without converging, it
+runs once more with the last updated coefficients. This final pass evaluates
+convergence and refreshes the histories, generic reports, and bespoke reports
+without adjusting or rewriting coefficients. Its history entry uses
+``component_iter = submodel_max_iterations + 1`` and records zero coefficient
+change; the component iteration count still counts only calibration update
+passes.
+
 The outer loop also stops early when every calibrated component converges in
 the same global iteration. Otherwise, it runs until ``global_iterations`` have
 completed. In either case, the remaining downstream models run once with the

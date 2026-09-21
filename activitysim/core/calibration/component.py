@@ -145,11 +145,17 @@ def _calibrate_component(
         else:
             mp_restore_checkpoint = "_"
 
-    for component_iter in range(1, component_settings.submodel_max_iterations + 1):
-        component_iterations = component_iter
-        run_model_name = (
-            f"{component_name}.c_i{component_iter};" f"g_i{global_iter};a_i{attempt}"
-        )
+    # The last pass evaluates the final updated coefficients without changing
+    # them again. Give it its own history index to retain the last update.
+    for component_iter in range(1, component_settings.submodel_max_iterations + 2):
+        evaluation_only = component_iter > component_settings.submodel_max_iterations
+        if evaluation_only:
+            run_model_name = f"{component_name}.c_final;g_i{global_iter};a_i{attempt}"
+        else:
+            component_iterations = component_iter
+            run_model_name = (
+                f"{component_name}.c_i{component_iter};g_i{global_iter};a_i{attempt}"
+            )
         _run_component_model(
             state=state,
             component_name=component_name,
@@ -179,11 +185,13 @@ def _calibrate_component(
             global_iter=global_iter,
             component_iter=component_iter,
             attempt=attempt,
+            update_coefficients=not evaluation_only,
         )
 
         coefficients_df = new_coefficients_df
 
-        _persist_coefficients_to_config(state, model_settings, coefficients_df)
+        if not evaluation_only:
+            _persist_coefficients_to_config(state, model_settings, coefficients_df)
         _append_iteration_records(state, component_name, row_records)
         _append_summary_records(state, [summary_record])
 
@@ -213,21 +221,6 @@ def _calibrate_component(
 
         if component_converged:
             break
-
-        if component_iter == component_settings.submodel_max_iterations:
-            # The update just persisted above has not yet been simulated. Run
-            # the component once more so final pipeline tables and downstream
-            # models use the coefficient values left in the config file.
-            _run_component_model(
-                state=state,
-                component_name=component_name,
-                run_model_name=(
-                    f"{component_name}.c_final;g_i{global_iter};a_i{attempt}"
-                ),
-                prior_step=prior_step,
-                mp_restore_checkpoint=mp_restore_checkpoint,
-                shared_data_buffers=shared_data_buffers,
-            )
 
     state.checkpoint.add(component_name)
 
@@ -420,8 +413,9 @@ def _evaluate_and_update(
     global_iter: int,
     component_iter: int,
     attempt: int = 1,
+    update_coefficients: bool = True,
 ) -> tuple[list[dict[str, Any]], dict[str, Any], pd.DataFrame, bool]:
-    """Evaluate spec rows, update coefficients, and return detailed records."""
+    """Evaluate spec rows and optionally update coefficients, returning records."""
     updated = coefficients_df.copy()
     records: list[dict[str, Any]] = []
 
@@ -467,33 +461,32 @@ def _evaluate_and_update(
         tolerance = float(row["tolerance"])
         converged = abs(difference) <= tolerance
 
-        damping = float(row["damping"])
-        raw_delta = _compute_delta(
-            method=method,
-            model_value=model_value,
-            target_value=target_value,
-            damping=damping,
-            component_name=component_name,
-            description=description,
-            default_increment=default_increment,
-        )
-
-        candidate_value = (
-            prev_value if hold_fast or converged else prev_value + raw_delta
-        )
-
-        at_min = False
-        at_max = False
-
+        candidate_value = prev_value
         lower = row["min"]
         upper = row["max"]
+        if update_coefficients:
+            damping = float(row["damping"])
+            raw_delta = _compute_delta(
+                method=method,
+                model_value=model_value,
+                target_value=target_value,
+                damping=damping,
+                component_name=component_name,
+                description=description,
+                default_increment=default_increment,
+            )
 
-        if not pd.isna(lower) and candidate_value <= float(lower):
-            candidate_value = float(lower)
-            at_min = True
-        if not pd.isna(upper) and candidate_value >= float(upper):
-            candidate_value = float(upper)
-            at_max = True
+            candidate_value = (
+                prev_value if hold_fast or converged else prev_value + raw_delta
+            )
+
+            if not pd.isna(lower) and candidate_value <= float(lower):
+                candidate_value = float(lower)
+            if not pd.isna(upper) and candidate_value >= float(upper):
+                candidate_value = float(upper)
+
+        at_min = not pd.isna(lower) and candidate_value <= float(lower)
+        at_max = not pd.isna(upper) and candidate_value >= float(upper)
 
         if not np.isfinite(candidate_value):
             raise RuntimeError(
