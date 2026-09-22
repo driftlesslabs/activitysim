@@ -772,3 +772,50 @@ def test_bounds_still_clip_eligible_updates(
     assert summary["max_change"] == pytest.approx(0.1)
     assert records[0]["at_min"] == (expected_value == -1.0)
     assert records[0]["at_max"] == (expected_value == 1.0)
+
+
+@pytest.mark.parametrize("templated", [False, True])
+def test_utility_coefficient_names_follow_referenced_template_rows(tmp_path, templated):
+    # Only alternative columns count. Labels, descriptions, expressions, and
+    # commented rows must not make an otherwise unused template row reachable.
+    (tmp_path / "spec.csv").write_text(
+        "Label,Description,Expression,A,B\n"
+        "coef_unused,coef_unused,coef_unused,coef_generic + 2 * coef_shared,0\n"
+        "#comment,ignored,1,coef_unused,coef_unused\n"
+    )
+    (tmp_path / "sample.csv").write_text(
+        "description,expression,utility\nignored,1,-coef_extra\n"
+    )
+    (tmp_path / "template.csv").write_text(
+        "coefficient_name,work,school\n"
+        "coef_generic,coef_work,coef_school\n"
+        "coef_shared,,\n"
+        "coef_extra,coef_extra_work,coef_extra_school\n"
+        "coef_unused,coef_unused_work,coef_unused_school\n"
+    )
+    state = SimpleNamespace(
+        filesystem=SimpleNamespace(get_config_file_path=lambda name: tmp_path / name)
+    )
+    settings = {"SPEC": "spec.csv", "SAMPLE_SPEC": "sample.csv"}
+    if templated:
+        settings["COEFFICIENT_TEMPLATE"] = "template.csv"
+    names = component._extract_utility_coefficient_names(state, settings)
+    expected = (
+        {
+            "coef_work",
+            "coef_school",
+            "coef_shared",
+            "coef_extra_work",
+            "coef_extra_school",
+        }
+        if templated
+        else {"coef_generic", "coef_shared", "coef_extra"}
+    )
+    assert names == expected
+    component._validate_calibration_coefficients_against_utility_spec(
+        "test_component", pd.DataFrame({"coefficient": sorted(expected)}), names
+    )
+    with pytest.raises(ValueError, match="coef_unused_work"):
+        component._validate_calibration_coefficients_against_utility_spec(
+            "test_component", pd.DataFrame({"coefficient": ["coef_unused_work"]}), names
+        )

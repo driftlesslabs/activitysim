@@ -294,16 +294,10 @@ def _extract_utility_coefficient_names(
     """
     Extract coefficient names used by the configured utility specifications.
 
-    Templated logit models map utility-spec row labels to actual coefficient
-    names by segment, so their template cell values are the source of truth.
-    Other models use coefficient tokens in utility-spec columns.
+    Templated logit models map generic tokens in utility-spec columns to
+    coefficient names by segment. Only referenced template rows contribute
+    names; unused template entries do not affect the utilities.
     """
-    if _setting_value(model_settings, "COEFFICIENT_TEMPLATE"):
-        template = simulate.read_model_coefficient_template(
-            state.filesystem, model_settings
-        )
-        return {str(name) for name in template.to_numpy().ravel()}
-
     names: set[str] = set()
 
     model_settings_dict = _settings_to_dict(model_settings)
@@ -343,6 +337,13 @@ def _extract_utility_coefficient_names(
                 text = str(value)
                 for token in re.findall(r"[A-Za-z_][A-Za-z0-9_]*", text):
                     names.add(token)
+
+    if _setting_value(model_settings, "COEFFICIENT_TEMPLATE"):
+        template = simulate.read_model_coefficient_template(
+            state.filesystem, model_settings
+        )
+        referenced_rows = template.loc[template.index.isin(names)]
+        return {str(name) for name in referenced_rows.to_numpy().ravel()}
 
     return names
 

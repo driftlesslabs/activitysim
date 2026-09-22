@@ -702,8 +702,12 @@ Calibration coefficients must satisfy these requirements:
 
 1. **Present in utility specification**: Every ``coefficient`` in the calibration
    spec must appear as a token in the component's utility expression CSV (the
-   files referenced by settings keys ending in ``SPEC``). A validation error is
-   raised at startup if any are missing.
+   files referenced by settings keys ending in ``SPEC``). For templated models,
+   a utility-column token must reference a row in ``COEFFICIENT_TEMPLATE`` that
+   maps to the calibration coefficient. Merely listing a coefficient in an
+   unused template row is insufficient. A validation error is raised before
+   the component runs if any are missing. This checks static references; it
+   does not guarantee that the corresponding segment occurs in the sample.
 
 2. **Present in coefficients file**: If a calibration coefficient is not found in
    the component's coefficients CSV, it is automatically added with an initial
