@@ -150,3 +150,22 @@ def test_summarize(initialize_pipeline: workflow.State, caplog):
         )
     )
     assert temporary_dataframe_deleted["deleted"].tolist() == [True]
+
+    # Comma-separated names are stripped; missing and repeated names are harmless.
+    multiple_variables_deleted = pd.read_csv(
+        state.get_output_file_path(
+            os.path.join(output_location, "multiple_variables_deleted.csv")
+        )
+    )
+    assert multiple_variables_deleted["deleted"].tolist() == [True]
+
+    # Only the exact Output value _del is reserved, and other variables survive.
+    unrelated_variable_preserved = pd.read_csv(
+        state.get_output_file_path(
+            os.path.join(output_location, "unrelated_variable_preserved.csv")
+        )
+    )
+    assert unrelated_variable_preserved["kept"].tolist() == [17, 23]
+    assert not Path(
+        state.get_output_file_path(os.path.join(output_location, "_del.csv"))
+    ).exists()

@@ -112,3 +112,12 @@ Description,Output,Expression
 ,_temporary_dataframe,trips_merged[['number_of_participants']]
 ,_del,_temporary_dataframe
 ,temporary_dataframe_deleted,"pd.Series(['_temporary_dataframe' not in locals()], name='deleted')"
+
+# Delete multiple names with whitespace, missing names, and duplicates; preserve an unrelated variable
+,_delete_first,trips_merged[['number_of_participants']]
+,_delete_second,trips_merged[['number_of_participants']].copy()
+,_del_keep,"pd.Series([17, 23], name='kept')"
+,_del," _delete_first , _missing_variable, _delete_second , _delete_first "
+,_del,_delete_second
+,multiple_variables_deleted,"pd.Series(['_delete_first' not in locals() and '_delete_second' not in locals() and '_missing_variable' not in locals()], name='deleted')"
+,unrelated_variable_preserved,_del_keep

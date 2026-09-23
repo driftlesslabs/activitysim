@@ -132,6 +132,7 @@ jobs:
       - run: uv run pytest test/random_seed/test_random_seed.py
       - run: uv run pytest test/skip_failed_choices/test_skip_failed_choices.py
       - run: uv run pytest test/trace_id/test_trace_id.py
+      - run: uv run pytest test/summarize/test_summarize.py
 
   builtin_regional_models:
     needs: foundation
