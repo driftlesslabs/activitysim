@@ -17,6 +17,7 @@ import numpy as np
 from activitysim.core import chunk, config, mem, timing, tracing, workflow
 from activitysim.core.configuration import FileSystem, Settings
 from activitysim.core.run_id import RunId
+from activitysim.core.extensions import import_extension
 
 from activitysim.abm.models.settings_checker import check_model_settings
 
@@ -24,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 INJECTABLES = [
+    "working_dir",
     "data_dir",
     "configs_dir",
     "data_model_dir",
@@ -163,31 +165,13 @@ def handle_standard_args(state: workflow.State, args, multiprocess=True):
     if args.working_dir:
         # activitysim will look in the current working directory for
         # 'configs', 'data', and 'output' folders by default
+        args.working_dir = os.path.abspath(args.working_dir)
         os.chdir(args.working_dir)
 
     inject_arg("run_id", state.tracing.run_id)
 
-    if args.ext:
-        for e in args.ext:
-            basepath, extpath = os.path.split(e)
-            if not basepath:
-                basepath = "."
-            sys.path.insert(0, os.path.abspath(basepath))
-            try:
-                importlib.import_module(extpath)
-            except ImportError as err:
-                logger.exception("ImportError")
-                raise
-            except Exception as err:
-                logger.exception(f"Error {err}")
-                raise
-            finally:
-                del sys.path[0]
-        inject_arg("imported_extensions", args.ext)
-    else:
-        inject_arg("imported_extensions", ())
-
     state.filesystem = FileSystem.parse_args(args)
+    state.import_extensions(args.ext or [], append=False)
     for config_dir in state.filesystem.get_configs_dir():
         if not config_dir.is_dir():
             print(f"missing config directory: {config_dir}", file=sys.stderr)
@@ -405,8 +389,9 @@ def run(args):
         if extension_names:
             for ext in extension_names:
                 try:
+                    extension = import_extension(ext)
                     settings_checker_ext = importlib.import_module(
-                        ext + ".settings_checker"
+                        extension.__name__ + ".settings_checker"
                     )
                     extension_checker_settings.update(
                         settings_checker_ext.EXTENSION_CHECKER_SETTINGS
