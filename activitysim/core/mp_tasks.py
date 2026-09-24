@@ -927,7 +927,8 @@ def setup_injectables_and_logging(injectables, locutor: bool = True) -> workflow
 
         # re-import extension modules to register injectables
         ext = state.get_injectable("imported_extensions", default=())
-        state.import_extensions(ext, append=False)
+        locations = state.get_injectable("_extension_locations", default={})
+        state.import_extensions([locations.get(e, e) for e in ext], append=False)
 
         state.add_injectable("is_sub_task", True)
         state.add_injectable("locutor", locutor)

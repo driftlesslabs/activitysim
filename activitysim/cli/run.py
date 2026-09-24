@@ -17,7 +17,6 @@ import numpy as np
 from activitysim.core import chunk, config, mem, timing, tracing, workflow
 from activitysim.core.configuration import FileSystem, Settings
 from activitysim.core.run_id import RunId
-from activitysim.core.extensions import import_extension
 
 from activitysim.abm.models.settings_checker import check_model_settings
 
@@ -33,6 +32,7 @@ INJECTABLES = [
     "cache_dir",
     "settings_file_name",
     "imported_extensions",
+    "_extension_locations",
     "run_timestamp",
     "run_id",
 ]
@@ -389,9 +389,8 @@ def run(args):
         if extension_names:
             for ext in extension_names:
                 try:
-                    extension = import_extension(ext)
                     settings_checker_ext = importlib.import_module(
-                        extension.__name__ + ".settings_checker"
+                        ext + ".settings_checker"
                     )
                     extension_checker_settings.update(
                         settings_checker_ext.EXTENSION_CHECKER_SETTINGS

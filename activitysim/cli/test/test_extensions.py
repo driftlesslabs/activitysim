@@ -46,6 +46,7 @@ use_shadow_pricing: false
 """
 
 API_RUNNER = """\
+import importlib
 import multiprocessing
 import os
 import sys
@@ -58,6 +59,10 @@ if __name__ == "__main__":
     model, output, extension, multiprocess, elsewhere = sys.argv[1:]
     state = workflow.State.make_default(Path(model), output_dir=Path(output))
     state.import_extensions(extension)
+    # Existing example repositories use this public list as importable names.
+    for name in state.get_injectable("imported_extensions"):
+        checker = importlib.import_module(name + ".settings_checker")
+        assert checker.EXTENSION_CHECKER_SETTINGS == {}
     state.settings.multiprocess = multiprocess == "yes"
     os.chdir(elsewhere)
     state.run.all()

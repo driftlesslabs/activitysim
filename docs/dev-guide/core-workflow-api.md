@@ -58,9 +58,11 @@ package name for each extension, as Python caches imports by module name.
 The CLI uses the same loader, for example
 `activitysim run -w /path/to/model --ext extensions`, or
 `activitysim run -c model/configs -d model/data -o output --ext model/extensions`.
-Both interfaces record absolute import locations in `imported_extensions` so
-multiprocessing workers can reimport the extensions even from another current
-directory. Package paths may include `./` or a trailing directory separator.
+Both interfaces retain importable module names in `imported_extensions`, so
+existing consumers can use them with `importlib.import_module`, including to
+load an extension's `settings_checker` submodule. Absolute import locations are
+stored separately in internal worker metadata, allowing multiprocessing workers
+to reimport extensions even from another current directory. Package paths may include `./` or a trailing directory separator.
 These rules are the same for single-process and multiprocessing runs.
 
 `append=False` replaces the registered extension list; it does not unload modules

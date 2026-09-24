@@ -213,15 +213,20 @@ class State:
         if isinstance(ext, (str, os.PathLike)):
             ext = [ext]
         extensions = list(self.get("imported_extensions", [])) if append else []
+        locations = dict(self.get("_extension_locations", {})) if append else {}
         try:
             working_dir = self.filesystem.working_dir
         except StateAccessError:
             working_dir = None
         for e in ext:
             location = resolve_extension(e, working_dir)
-            import_extension(location)
-            extensions.append(location)
+            module = import_extension(location)
+            # Keep the public registry usable with importlib (e.g. external
+            # settings checkers). Worker lookup paths are separate metadata.
+            extensions.append(module.__name__)
+            locations[module.__name__] = location
         self.set("imported_extensions", extensions)
+        self.set("_extension_locations", locations)
 
     filesystem: FileSystem = StateAttr(FileSystem)
     settings: Settings = StateAttr(Settings)
